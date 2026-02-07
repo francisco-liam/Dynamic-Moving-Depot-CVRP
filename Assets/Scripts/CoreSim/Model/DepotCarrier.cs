@@ -12,6 +12,9 @@ namespace CoreSim.Model
         // Option B: discrete candidate rendezvous positions
         public List<DepotCandidateStop> CandidateStops { get; } = new List<DepotCandidateStop>();
 
+        public Vec2? TargetPos { get; set; } = null;
+        public int TargetStopId { get; set; } = -1;
+
         public DepotCarrier(Vec2 startPos, float speed)
         {
             Pos = startPos;

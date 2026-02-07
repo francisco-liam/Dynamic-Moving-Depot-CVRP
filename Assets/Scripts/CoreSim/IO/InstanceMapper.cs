@@ -16,6 +16,9 @@ namespace CoreSim.IO
             // Speeds with config overrides
             float truckSpeed = cfg.OverrideTruckSpeed ?? dto.TruckSpeed;
             float depotSpeed = cfg.OverrideDepotSpeed ?? dto.DepotSpeed;
+            bool movingDepot = dto.Features.HasFlag(ProblemFeatures.MovingDepot);
+            if (!movingDepot)
+                depotSpeed = 0f;
 
             // Determine primary depot node id
             int depotNodeId = (dto.DepotNodeIds.Count > 0) ? dto.DepotNodeIds[0] : 1;
@@ -39,6 +42,11 @@ namespace CoreSim.IO
             }
 
             var state = new SimState(dto.Capacity, depot);
+            state.Features = dto.Features;
+            state.EnergyCapacity = dto.EnergyCapacity;
+            state.EnergyConsumption = dto.EnergyConsumption;
+            if (dto.StationNodeIds != null)
+                state.StationNodeIds.AddRange(dto.StationNodeIds);
 
             // Customers: all nodes except depot nodes
             var depotSet = new HashSet<int>(dto.DepotNodeIds.Count > 0 ? dto.DepotNodeIds : new List<int> { 1 });
@@ -69,9 +77,18 @@ namespace CoreSim.IO
         public static void CreateDemoFleet(SimState state, int truckCount, float truckSpeed)
         {
             state.Trucks.Clear();
+            float batteryCapacity = state.Features.HasFlag(ProblemFeatures.Electric) ? (state.EnergyCapacity ?? 0f) : 0f;
+            float energyConsumption = state.Features.HasFlag(ProblemFeatures.Electric) ? (state.EnergyConsumption ?? 0f) : 0f;
             for (int i = 0; i < truckCount; i++)
             {
-                state.Trucks.Add(new Truck(id: i + 1, startPos: state.Depot.Pos, capacity: state.Capacity, speed: truckSpeed));
+                state.Trucks.Add(new Truck(
+                    id: i + 1,
+                    startPos: state.Depot.Pos,
+                    capacity: state.Capacity,
+                    speed: truckSpeed,
+                    batteryCapacity: batteryCapacity,
+                    energyConsumption: energyConsumption
+                ));
             }
         }
     }
