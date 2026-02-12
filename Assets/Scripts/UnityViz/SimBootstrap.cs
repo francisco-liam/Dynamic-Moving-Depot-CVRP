@@ -22,12 +22,13 @@ public sealed class SimBootstrap : MonoBehaviour
 
     private void Start()
     {
-        int finalSeed = seed;
+        int finalSeed = useRandomSeed ? System.Environment.TickCount : seed;
+        SimReset(finalSeed, instancePath: "");
+    }
 
-        if (useRandomSeed)
-        {
-            finalSeed = System.Environment.TickCount;
-        }
+    public void SimReset(int newSeed, string instancePath)
+    {
+        seed = newSeed;
 
         var logger = new SimLogger
         {
@@ -35,13 +36,12 @@ public sealed class SimBootstrap : MonoBehaviour
             MinLevel = minLogLevel
         };
 
-        _run = new SimRunContext(finalSeed, logger);
-
+        _run = new SimRunContext(seed, logger);
         _simTime = 0f;
 
-        // Print initial run info
-        _run.Logger.Info($"Simulation started. Seed={_run.Seed}");
-        Debug.Log($"[Unity] Simulation started. Seed={_run.Seed}");
+        string pathMsg = string.IsNullOrEmpty(instancePath) ? "" : $" Instance={instancePath}";
+        _run.Logger.Info($"Simulation reset. Seed={_run.Seed}.{pathMsg}");
+        Debug.Log($"[Unity] Simulation reset. Seed={_run.Seed}.{pathMsg}");
     }
 
     private void Update()

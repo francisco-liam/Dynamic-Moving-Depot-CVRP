@@ -35,7 +35,7 @@ namespace CoreSim.Sim
                 var c = State.Customers[i];
                 if (c.Status == CustomerStatus.Unreleased && c.ReleaseTime <= t1)
                 {
-                    c.Status = CustomerStatus.Available;
+                    c.Status = CustomerStatus.Waiting;
                     Queue.Enqueue(new SimEvent(t1, SimEventType.CustomerReleased, a: c.Id));
                 }
             }
@@ -47,16 +47,23 @@ namespace CoreSim.Sim
             // 4) Move trucks toward their targets (if any)
             for (int i = 0; i < State.Trucks.Count; i++)
             {
-                MoveTruck(State.Trucks[i], dt);
-            }
+                var truck = State.Trucks[i];
 
-            // 5) Fire due events (time-ordered) up to current time
-            // In Phase 2 we mostly enqueue "now" events; still good to have the mechanism.
-            while (Queue.TryPeek(out var e) && e.Time <= State.Time + 1e-6f)
-            {
-                Queue.TryDequeue(out e);
-                // For now, we don't mutate state here; we just expose events to UnityViz/logger.
-                // Later we can route these to handlers.
+                if (truck.State == TruckState.Servicing)
+                {
+                    UpdateService(truck, dt);
+                    continue;
+                }
+
+                if (!EnsureTruckTarget(truck))
+                {
+                    truck.State = TruckState.Idle;
+                    continue;
+                }
+
+                bool arrived = MoveTruck(truck, dt);
+                if (arrived)
+                    HandleArrival(truck);
             }
         }
 
@@ -81,9 +88,9 @@ namespace CoreSim.Sim
             }
         }
 
-        private void MoveTruck(Truck truck, float dt)
+        private bool MoveTruck(Truck truck, float dt)
         {
-            if (truck.TargetPos == null) return;
+            if (truck.TargetPos == null) return false;
 
             Vec2 target = truck.TargetPos.Value;
             float maxDist = truck.Speed * dt;
@@ -104,9 +111,139 @@ namespace CoreSim.Sim
             {
                 truck.Pos = target;
                 Queue.Enqueue(new SimEvent(State.Time, SimEventType.TruckArrived, a: truck.Id, b: truck.TargetId));
-                truck.TargetPos = null;
-                truck.TargetId = -1;
+                return true;
             }
+
+            return false;
+        }
+
+        private bool EnsureTruckTarget(Truck truck)
+        {
+            if (truck.TargetPos != null)
+                return true;
+
+            if (!truck.HasPlanTarget)
+                return false;
+
+            var target = truck.CurrentTarget;
+            if (target == null)
+                return false;
+
+            if (!TryResolveTargetPos(target.Value, out var pos))
+                return false;
+
+            truck.TargetPos = pos;
+            truck.TargetId = target.Value.Id;
+            truck.State = TruckState.Traveling;
+            return true;
+        }
+
+        private bool TryResolveTargetPos(TargetRef target, out Vec2 pos)
+        {
+            if (target.Type == TargetType.Depot)
+            {
+                pos = State.Depot.Pos;
+                return true;
+            }
+
+            if (target.Type == TargetType.Customer)
+            {
+                var customer = State.GetCustomerById(target.Id);
+                if (customer != null)
+                {
+                    pos = customer.Pos;
+                    return true;
+                }
+            }
+
+            if (target.Type == TargetType.Station)
+            {
+                if (State.StationPositions.TryGetValue(target.Id, out var stationPos))
+                {
+                    pos = stationPos;
+                    return true;
+                }
+            }
+
+            pos = default;
+            return false;
+        }
+
+        private void HandleArrival(Truck truck)
+        {
+            var target = truck.CurrentTarget;
+            truck.TargetPos = null;
+            truck.TargetId = -1;
+
+            if (target == null)
+            {
+                truck.State = TruckState.Idle;
+                return;
+            }
+
+            if (target.Value.Type == TargetType.Customer)
+            {
+                var customer = State.GetCustomerById(target.Value.Id);
+                if (customer == null || customer.Status == CustomerStatus.Served)
+                {
+                    AdvancePlan(truck);
+                    return;
+                }
+
+                customer.Status = CustomerStatus.InService;
+                customer.AssignedTruckId = truck.Id;
+
+                truck.State = TruckState.Servicing;
+                truck.ServicingCustomerId = customer.Id;
+                truck.ServiceRemaining = customer.ServiceTime;
+
+                if (truck.ServiceRemaining <= 0f)
+                    CompleteService(truck);
+
+                return;
+            }
+
+            AdvancePlan(truck);
+        }
+
+        private void UpdateService(Truck truck, float dt)
+        {
+            if (truck.ServicingCustomerId < 0)
+                return;
+
+            truck.ServiceRemaining -= dt;
+            if (truck.ServiceRemaining <= 0f)
+                CompleteService(truck);
+        }
+
+        private void CompleteService(Truck truck)
+        {
+            var customer = State.GetCustomerById(truck.ServicingCustomerId);
+            if (customer != null)
+            {
+                customer.Status = CustomerStatus.Served;
+                customer.AssignedTruckId = truck.Id;
+                truck.Load += customer.Demand;
+                Queue.Enqueue(new SimEvent(State.Time, SimEventType.CustomerServed, a: customer.Id, b: truck.Id));
+            }
+
+            truck.State = TruckState.Idle;
+            truck.ServiceRemaining = 0f;
+            truck.ServicingCustomerId = -1;
+
+            AdvancePlan(truck);
+        }
+
+        private void AdvancePlan(Truck truck)
+        {
+            truck.CurrentTargetIndex += 1;
+            if (!truck.HasPlanTarget)
+            {
+                truck.State = TruckState.Idle;
+                return;
+            }
+
+            truck.State = TruckState.Idle;
         }
 
         private static Vec2 MoveToward(Vec2 from, Vec2 to, float maxDist)

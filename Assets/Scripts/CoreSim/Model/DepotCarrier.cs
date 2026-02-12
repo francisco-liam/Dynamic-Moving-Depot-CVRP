@@ -9,6 +9,10 @@ namespace CoreSim.Model
         public Vec2 Pos { get; set; }
         public float Speed { get; set; }
 
+        // Moving depot schedule (unused when stationary)
+        public List<DepotStop> Stops { get; } = new List<DepotStop>();
+        public int CurrentStopIndex { get; set; } = 0;
+
         // Option B: discrete candidate rendezvous positions
         public List<DepotCandidateStop> CandidateStops { get; } = new List<DepotCandidateStop>();
 

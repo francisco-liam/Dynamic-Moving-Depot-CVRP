@@ -46,7 +46,15 @@ namespace CoreSim.IO
             state.EnergyCapacity = dto.EnergyCapacity;
             state.EnergyConsumption = dto.EnergyConsumption;
             if (dto.StationNodeIds != null)
+            {
                 state.StationNodeIds.AddRange(dto.StationNodeIds);
+                for (int i = 0; i < dto.StationNodeIds.Count; i++)
+                {
+                    int stationId = dto.StationNodeIds[i];
+                    if (stationId >= 0 && stationId < dto.NodePos.Length)
+                        state.StationPositions[stationId] = dto.NodePos[stationId];
+                }
+            }
 
             // Customers: all nodes except depot nodes
             var depotSet = new HashSet<int>(dto.DepotNodeIds.Count > 0 ? dto.DepotNodeIds : new List<int> { 1 });
@@ -60,11 +68,12 @@ namespace CoreSim.IO
                     id: nodeId,
                     pos: dto.NodePos[nodeId],
                     demand: dto.Demand[nodeId],
-                    releaseTime: dto.ReleaseTime[nodeId]
+                    releaseTime: dto.ReleaseTime[nodeId],
+                    serviceTime: 0f
                 );
 
                 // initial status based on time=0
-                c.Status = (c.ReleaseTime <= 0f) ? CustomerStatus.Available : CustomerStatus.Unreleased;
+                c.Status = (c.ReleaseTime <= 0f) ? CustomerStatus.Waiting : CustomerStatus.Unreleased;
 
                 state.Customers.Add(c);
             }

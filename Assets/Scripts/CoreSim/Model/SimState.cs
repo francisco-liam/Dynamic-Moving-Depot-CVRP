@@ -1,6 +1,7 @@
 #nullable enable
 using System.Collections.Generic;
 using CoreSim.IO;
+using CoreSim.Math;
 
 namespace CoreSim.Model
 {
@@ -18,11 +19,22 @@ namespace CoreSim.Model
         public float? EnergyCapacity { get; set; } = null;
         public float? EnergyConsumption { get; set; } = null;
         public List<int> StationNodeIds { get; } = new List<int>();
+        public Dictionary<int, Vec2> StationPositions { get; } = new Dictionary<int, Vec2>();
 
         public SimState(int capacity, DepotCarrier depot)
         {
             Capacity = capacity;
             Depot = depot;
+        }
+
+        public Customer? GetCustomerById(int id)
+        {
+            for (int i = 0; i < Customers.Count; i++)
+            {
+                if (Customers[i].Id == id)
+                    return Customers[i];
+            }
+            return null;
         }
     }
 }

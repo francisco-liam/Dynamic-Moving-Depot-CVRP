@@ -39,5 +39,7 @@ namespace CoreSim.Events
         }
 
         public void Clear() => _events.Clear();
+
+        public List<SimEvent> ToList() => new List<SimEvent>(_events);
     }
 }
