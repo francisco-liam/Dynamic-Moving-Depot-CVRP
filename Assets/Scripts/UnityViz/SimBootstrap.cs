@@ -13,6 +13,7 @@ public sealed class SimBootstrap : MonoBehaviour
     [Header("Logging")]
     public bool enableLogging = true;
     public LogLevel minLogLevel = LogLevel.Info;
+    public bool printSimTime = true;
 
     [Header("Sim")]
     public float simTimeScale = 1f;
@@ -50,7 +51,7 @@ public sealed class SimBootstrap : MonoBehaviour
         _simTime += dt;
 
         // For Phase 0: print time every ~1 second
-        if (Mathf.FloorToInt(_simTime) != Mathf.FloorToInt(_simTime - dt))
+        if (printSimTime && Mathf.FloorToInt(_simTime) != Mathf.FloorToInt(_simTime - dt))
         {
             string msg = $"SimTime={_simTime:F2}s";
             _run.Logger.Info(msg);

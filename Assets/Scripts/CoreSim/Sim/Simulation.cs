@@ -61,10 +61,24 @@ namespace CoreSim.Sim
                     continue;
                 }
 
+                var target = truck.CurrentTarget;
+                if (target == null)
+                {
+                    truck.State = TruckState.Idle;
+                    continue;
+                }
+
+                if (TryStartServiceAtTarget(truck, target.Value))
+                    continue;
+
                 bool arrived = MoveTruck(truck, dt);
                 if (arrived)
-                    HandleArrival(truck);
+                    ProcessArrival(truck, target.Value, arrivedNow: true);
             }
+
+#if DEBUG
+            RunDebugChecks();
+#endif
         }
 
         private void MoveDepot(float dt)
@@ -110,7 +124,6 @@ namespace CoreSim.Sim
             if (Vec2.Distance(newPos, target) <= _arriveEpsilon)
             {
                 truck.Pos = target;
-                Queue.Enqueue(new SimEvent(State.Time, SimEventType.TruckArrived, a: truck.Id, b: truck.TargetId));
                 return true;
             }
 
@@ -131,6 +144,12 @@ namespace CoreSim.Sim
 
             if (!TryResolveTargetPos(target.Value, out var pos))
                 return false;
+
+            if (truck.ActiveTarget == null || !truck.ActiveTarget.Value.Equals(target.Value))
+            {
+                truck.ActiveTarget = target.Value;
+                truck.ArrivedOnActiveTarget = false;
+            }
 
             truck.TargetPos = pos;
             truck.TargetId = target.Value.Id;
@@ -169,41 +188,126 @@ namespace CoreSim.Sim
             return false;
         }
 
-        private void HandleArrival(Truck truck)
+        private bool TryStartServiceAtTarget(Truck truck, TargetRef target)
         {
-            var target = truck.CurrentTarget;
+            if (truck.TargetPos == null) return false;
+            if (target.Type != TargetType.Customer) return false;
+
+            float dist = Vec2.Distance(truck.Pos, truck.TargetPos.Value);
+            if (dist > _arriveEpsilon) return false;
+
+            var customer = State.GetCustomerById(target.Id);
+            if (customer == null) return false;
+
+            if (customer.Status == CustomerStatus.Unreleased)
+            {
+                if (!truck.ArrivedOnActiveTarget)
+                    Queue.Enqueue(new SimEvent(State.Time, SimEventType.TruckArrived, a: truck.Id, b: target.Id));
+
+                truck.ArrivedOnActiveTarget = true;
+                truck.State = TruckState.Idle;
+                Warn($"Truck {truck.Id} at customer {customer.Id} before release time.");
+                return true;
+            }
+
+            if (customer.Status == CustomerStatus.Served)
+            {
+                if (!truck.ArrivedOnActiveTarget)
+                    Queue.Enqueue(new SimEvent(State.Time, SimEventType.TruckArrived, a: truck.Id, b: target.Id));
+
+                truck.ArrivedOnActiveTarget = true;
+                Warn($"Truck {truck.Id} attempted to serve already served customer {customer.Id}.");
+                AdvancePlan(truck);
+                return true;
+            }
+
+            if (customer.Status != CustomerStatus.Waiting)
+            {
+                Warn($"Invalid customer state transition to InService. Customer {customer.Id} status={customer.Status}.");
+                return true;
+            }
+
+            if (!truck.ArrivedOnActiveTarget)
+                Queue.Enqueue(new SimEvent(State.Time, SimEventType.TruckArrived, a: truck.Id, b: target.Id));
+
+            truck.ArrivedOnActiveTarget = true;
             truck.TargetPos = null;
             truck.TargetId = -1;
 
-            if (target == null)
+            StartService(truck, customer);
+            return true;
+        }
+
+        private void ProcessArrival(Truck truck, TargetRef target, bool arrivedNow)
+        {
+            bool firstArrival = arrivedNow && !truck.ArrivedOnActiveTarget;
+            if (firstArrival)
+            {
+                truck.ArrivedOnActiveTarget = true;
+                Queue.Enqueue(new SimEvent(State.Time, SimEventType.TruckArrived, a: truck.Id, b: target.Id));
+            }
+
+            truck.TargetPos = null;
+            truck.TargetId = -1;
+
+            if (!firstArrival && target.Type != TargetType.Customer)
             {
                 truck.State = TruckState.Idle;
                 return;
             }
 
-            if (target.Value.Type == TargetType.Customer)
+            if (target.Type == TargetType.Customer)
             {
-                var customer = State.GetCustomerById(target.Value.Id);
-                if (customer == null || customer.Status == CustomerStatus.Served)
+                var customer = State.GetCustomerById(target.Id);
+                if (customer == null)
                 {
+                    Warn($"Truck {truck.Id} arrived at missing customer {target.Id}.");
+                    return;
+                }
+
+                if (customer.Status == CustomerStatus.Unreleased)
+                {
+                    Warn($"Truck {truck.Id} arrived at unreleased customer {customer.Id}.");
+                    truck.State = TruckState.Idle;
+                    return;
+                }
+
+                if (customer.Status == CustomerStatus.Served)
+                {
+                    Warn($"Truck {truck.Id} arrived at served customer {customer.Id}.");
+                    truck.State = TruckState.Idle;
                     AdvancePlan(truck);
                     return;
                 }
 
-                customer.Status = CustomerStatus.InService;
-                customer.AssignedTruckId = truck.Id;
+                if (customer.Status != CustomerStatus.Waiting)
+                {
+                    Warn($"Invalid customer state on arrival. Customer {customer.Id} status={customer.Status}.");
+                    truck.State = TruckState.Idle;
+                    return;
+                }
 
-                truck.State = TruckState.Servicing;
-                truck.ServicingCustomerId = customer.Id;
-                truck.ServiceRemaining = customer.ServiceTime;
-
-                if (truck.ServiceRemaining <= 0f)
-                    CompleteService(truck);
-
+                StartService(truck, customer);
                 return;
             }
 
-            AdvancePlan(truck);
+            if (arrivedNow)
+                AdvancePlan(truck);
+            else
+                truck.State = TruckState.Idle;
+        }
+
+        private void StartService(Truck truck, Customer customer)
+        {
+            customer.Status = CustomerStatus.InService;
+            customer.AssignedTruckId = truck.Id;
+
+            truck.State = TruckState.Servicing;
+            truck.ServicingCustomerId = customer.Id;
+            truck.ServiceRemaining = customer.ServiceTime;
+
+            if (truck.ServiceRemaining <= 0f)
+                CompleteService(truck);
         }
 
         private void UpdateService(Truck truck, float dt)
@@ -219,12 +323,19 @@ namespace CoreSim.Sim
         private void CompleteService(Truck truck)
         {
             var customer = State.GetCustomerById(truck.ServicingCustomerId);
-            if (customer != null)
+            if (customer != null && customer.Status == CustomerStatus.InService)
             {
                 customer.Status = CustomerStatus.Served;
                 customer.AssignedTruckId = truck.Id;
                 truck.Load += customer.Demand;
-                Queue.Enqueue(new SimEvent(State.Time, SimEventType.CustomerServed, a: customer.Id, b: truck.Id));
+                if (truck.Capacity > 0 && truck.Load > truck.Capacity)
+                    Warn($"Truck {truck.Id} capacity exceeded. Load={truck.Load}, Capacity={truck.Capacity}.");
+
+                Queue.Enqueue(new SimEvent(State.Time, SimEventType.CustomerServed, a: truck.Id, b: customer.Id));
+            }
+            else
+            {
+                Warn($"Invalid service completion. Truck {truck.Id} customer={truck.ServicingCustomerId}.");
             }
 
             truck.State = TruckState.Idle;
@@ -237,6 +348,8 @@ namespace CoreSim.Sim
         private void AdvancePlan(Truck truck)
         {
             truck.CurrentTargetIndex += 1;
+            truck.ActiveTarget = null;
+            truck.ArrivedOnActiveTarget = false;
             if (!truck.HasPlanTarget)
             {
                 truck.State = TruckState.Idle;
@@ -245,6 +358,55 @@ namespace CoreSim.Sim
 
             truck.State = TruckState.Idle;
         }
+
+        private void Warn(string message)
+        {
+            System.Diagnostics.Debug.WriteLine(message);
+            try { Console.WriteLine(message); } catch { }
+        }
+
+#if DEBUG
+        private void RunDebugChecks()
+        {
+            var servicingCounts = new System.Collections.Generic.Dictionary<int, int>();
+
+            for (int i = 0; i < State.Trucks.Count; i++)
+            {
+                var t = State.Trucks[i];
+                if (t.Load < 0)
+                    throw new InvalidOperationException($"Truck {t.Id} load out of bounds: {t.Load}/{t.Capacity}.");
+
+                if (t.Capacity > 0 && t.Load > t.Capacity)
+                    throw new InvalidOperationException($"Truck {t.Id} load out of bounds: {t.Load}/{t.Capacity}.");
+
+                if (t.State == TruckState.Servicing)
+                {
+                    if (t.ServicingCustomerId < 0)
+                        throw new InvalidOperationException($"Truck {t.Id} servicing with invalid customer id.");
+
+                    if (!servicingCounts.ContainsKey(t.ServicingCustomerId))
+                        servicingCounts[t.ServicingCustomerId] = 0;
+                    servicingCounts[t.ServicingCustomerId] += 1;
+                }
+
+                if (t.CurrentTargetIndex < 0 || t.CurrentTargetIndex > t.Plan.Count)
+                    throw new InvalidOperationException($"Truck {t.Id} CurrentTargetIndex out of range.");
+            }
+
+            for (int i = 0; i < State.Customers.Count; i++)
+            {
+                var c = State.Customers[i];
+                if (c.Status == CustomerStatus.InService)
+                {
+                    if (c.AssignedTruckId == null || c.AssignedTruckId.Value < 0)
+                        throw new InvalidOperationException($"Customer {c.Id} InService without assigned truck.");
+
+                    if (!servicingCounts.TryGetValue(c.Id, out var count) || count != 1)
+                        throw new InvalidOperationException($"Customer {c.Id} InService but servicing count={count}.");
+                }
+            }
+        }
+#endif
 
         private static Vec2 MoveToward(Vec2 from, Vec2 to, float maxDist)
         {

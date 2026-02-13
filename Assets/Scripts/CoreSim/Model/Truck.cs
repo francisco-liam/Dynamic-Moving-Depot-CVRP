@@ -37,6 +37,9 @@ namespace CoreSim.Model
         public Vec2? TargetPos { get; set; } = null;
         public int TargetId { get; set; } = -1; // e.g., customer id 
 
+        public TargetRef? ActiveTarget { get; set; } = null;
+        public bool ArrivedOnActiveTarget { get; set; } = false;
+
         public Truck(int id, Vec2 startPos, int capacity, float speed, float batteryCapacity = 0f, float energyConsumption = 0f)
         {
             Id = id;

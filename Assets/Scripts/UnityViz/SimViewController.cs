@@ -20,6 +20,7 @@ public sealed class SimViewController : MonoBehaviour
     public bool autoPlay = true;
     public float speedMultiplier = 1f;
     public float fixedStep = 0.1f;
+    public bool logEvents = true;
 
     [Header("Demo Fleet")]
     public int demoTruckCount = 3;
@@ -32,6 +33,7 @@ public sealed class SimViewController : MonoBehaviour
 
     private bool _isPlaying;
     private float _accumulator;
+    private int _lastEventCount;
 
     private void Awake()
     {
@@ -63,6 +65,8 @@ public sealed class SimViewController : MonoBehaviour
                 Simulation.Step(fixedStep);
                 _accumulator -= fixedStep;
             }
+
+            LogNewEvents();
         }
 
         if (simRenderer != null)
@@ -79,6 +83,7 @@ public sealed class SimViewController : MonoBehaviour
     {
         if (Simulation == null) return;
         Simulation.Step(fixedStep);
+        LogNewEvents();
         if (simRenderer != null && State != null)
             simRenderer.Render(State);
     }
@@ -119,6 +124,7 @@ public sealed class SimViewController : MonoBehaviour
 
         Simulation = new Simulation(State);
         _accumulator = 0f;
+        _lastEventCount = 0;
 
         if (simRenderer != null)
             simRenderer.SetState(State);
@@ -126,11 +132,19 @@ public sealed class SimViewController : MonoBehaviour
 
     private string ResolveInstancePath(string path)
     {
-        if (!string.IsNullOrEmpty(path))
+        string folder = Path.Combine(Application.streamingAssetsPath, "Instances");
+
+        if (string.IsNullOrEmpty(path))
+            return Path.Combine(folder, defaultInstanceFile);
+
+        if (Path.IsPathRooted(path))
             return path;
 
-        string folder = Path.Combine(Application.streamingAssetsPath, "Instances");
-        return Path.Combine(folder, defaultInstanceFile);
+        string candidate = Path.Combine(folder, path);
+        if (File.Exists(candidate))
+            return candidate;
+
+        return path;
     }
 
     private static void AssignDemoPlans(SimState state, int targetsPerTruck)
@@ -147,6 +161,8 @@ public sealed class SimViewController : MonoBehaviour
             truck.LockedPrefixCount = 0;
             truck.TargetPos = null;
             truck.TargetId = -1;
+            truck.ActiveTarget = null;
+            truck.ArrivedOnActiveTarget = false;
             truck.State = TruckState.Idle;
 
             int added = 0;
@@ -161,5 +177,19 @@ public sealed class SimViewController : MonoBehaviour
                 custIndex += 1;
             }
         }
+    }
+
+    private void LogNewEvents()
+    {
+        if (!logEvents || Simulation == null) return;
+
+        int count = Simulation.Queue.Count;
+        if (count <= _lastEventCount) return;
+
+        var events = Simulation.Queue.ToList();
+        for (int i = _lastEventCount; i < events.Count; i++)
+            Debug.Log($"[SimEvent] {events[i]}");
+
+        _lastEventCount = count;
     }
 }
