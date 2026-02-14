@@ -25,6 +25,8 @@ namespace CoreSim.Model
         public float BatteryCapacity { get; }
         public float Battery { get; set; }
         public float EnergyConsumption { get; set; }
+        public float TotalDistanceTraveled { get; set; } = 0f;
+        public float TotalEnergyUsed { get; set; } = 0f;
 
         public List<TargetRef> Plan { get; } = new List<TargetRef>();
         public int LockedPrefixCount { get; set; } = 0;

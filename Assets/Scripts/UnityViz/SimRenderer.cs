@@ -61,11 +61,25 @@ public sealed class SimRenderer : MonoBehaviour
         if (state == null) return;
         if (_state != state)
             SetState(state);
+        else
+            EnsureDynamicCounts(state);
 
         UpdateDepot();
         UpdateCustomers();
         UpdateStations();
         UpdateTrucks();
+    }
+
+    private void EnsureDynamicCounts(SimState state)
+    {
+        if (_customers.Count < state.Customers.Count)
+            EnsureCustomers();
+
+        if (_stations.Count < state.StationNodeIds.Count)
+            EnsureStations();
+
+        if (_trucks.Count < state.Trucks.Count)
+            EnsureTrucks();
     }
 
     private void BuildAll()

@@ -98,6 +98,17 @@ public sealed class SimViewController : MonoBehaviour
         instancePath = path;
     }
 
+    public Customer InsertCustomer(CustomerSpec spec)
+    {
+        if (Simulation == null)
+        {
+            Debug.LogWarning("Simulation not ready; cannot insert customer.");
+            return null;
+        }
+
+        return Simulation.InsertCustomer(spec);
+    }
+
     public void ResetSim(int newSeed, string path)
     {
         seed = newSeed;
@@ -183,13 +194,13 @@ public sealed class SimViewController : MonoBehaviour
     {
         if (!logEvents || Simulation == null) return;
 
-        int count = Simulation.Queue.Count;
-        if (count <= _lastEventCount) return;
+        var events = Simulation.RecentEvents;
+        if (events.Count < _lastEventCount)
+            _lastEventCount = 0;
 
-        var events = Simulation.Queue.ToList();
         for (int i = _lastEventCount; i < events.Count; i++)
             Debug.Log($"[SimEvent] {events[i]}");
 
-        _lastEventCount = count;
+        _lastEventCount = events.Count;
     }
 }

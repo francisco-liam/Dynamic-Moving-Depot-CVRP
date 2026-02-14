@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using CoreSim.Events;
 using CoreSim.Math;
 using CoreSim.Model;
@@ -10,6 +11,10 @@ namespace CoreSim.Sim
     {
         public SimState State { get; }
         public EventQueue Queue { get; } = new EventQueue();
+        public IReadOnlyList<SimEvent> RecentEvents => _recentEvents;
+        public int RecentEventsCapacity { get; set; } = 100;
+
+        private readonly List<SimEvent> _recentEvents = new List<SimEvent>();
 
         private readonly float _arriveEpsilon;
 
@@ -17,6 +22,27 @@ namespace CoreSim.Sim
         {
             State = state;
             _arriveEpsilon = arriveEpsilon;
+        }
+
+        public Customer InsertCustomer(CustomerSpec spec)
+        {
+            int nextId = 1;
+            for (int i = 0; i < State.Customers.Count; i++)
+                nextId = System.Math.Max(nextId, State.Customers[i].Id + 1);
+
+            float releaseTime = spec.ReleaseTime > 0f ? spec.ReleaseTime : State.Time;
+            var customer = new Customer(nextId, spec.Pos, spec.Demand, releaseTime, spec.ServiceTime);
+            customer.Status = (releaseTime <= State.Time) ? CustomerStatus.Waiting : CustomerStatus.Unreleased;
+
+            State.Customers.Add(customer);
+
+            EmitEvent(new SimEvent(State.Time, SimEventType.CustomerInserted, a: customer.Id, b: customer.Demand));
+
+            // If inserted as waiting, also emit release immediately to keep event semantics consistent.
+            if (customer.Status == CustomerStatus.Waiting)
+                EmitEvent(new SimEvent(State.Time, SimEventType.CustomerReleased, a: customer.Id));
+
+            return customer;
         }
 
         public void Step(float dt)
@@ -36,7 +62,7 @@ namespace CoreSim.Sim
                 if (c.Status == CustomerStatus.Unreleased && c.ReleaseTime <= t1)
                 {
                     c.Status = CustomerStatus.Waiting;
-                    Queue.Enqueue(new SimEvent(t1, SimEventType.CustomerReleased, a: c.Id));
+                    EmitEvent(new SimEvent(t1, SimEventType.CustomerReleased, a: c.Id));
                 }
             }
 
@@ -96,7 +122,7 @@ namespace CoreSim.Sim
             {
                 // Snap + emit arrival
                 depot.Pos = target;
-                Queue.Enqueue(new SimEvent(State.Time, SimEventType.DepotArrived, a: depot.TargetStopId));
+                EmitEvent(new SimEvent(State.Time, SimEventType.DepotArrived, a: depot.TargetStopId));
                 depot.TargetPos = null;
                 depot.TargetStopId = -1;
             }
@@ -113,12 +139,14 @@ namespace CoreSim.Sim
             float moveDist = Vec2.Distance(truck.Pos, newPos);
 
             truck.Pos = newPos;
+            truck.TotalDistanceTraveled += moveDist;
 
             if (State.Features.HasFlag(CoreSim.IO.ProblemFeatures.Electric) && truck.EnergyConsumption > 0f)
             {
                 float energyUsed = moveDist * truck.EnergyConsumption;
                 truck.Battery = System.Math.Max(0f, truck.Battery - energyUsed);
-                Queue.Enqueue(new SimEvent(State.Time, SimEventType.TruckEnergyChanged, a: truck.Id, b: (int)System.Math.Round(truck.Battery)));
+                truck.TotalEnergyUsed += energyUsed;
+                EmitEvent(new SimEvent(State.Time, SimEventType.TruckEnergyChanged, a: truck.Id, b: (int)System.Math.Round(truck.Battery)));
             }
 
             if (Vec2.Distance(newPos, target) <= _arriveEpsilon)
@@ -202,7 +230,7 @@ namespace CoreSim.Sim
             if (customer.Status == CustomerStatus.Unreleased)
             {
                 if (!truck.ArrivedOnActiveTarget)
-                    Queue.Enqueue(new SimEvent(State.Time, SimEventType.TruckArrived, a: truck.Id, b: target.Id));
+                    EmitEvent(new SimEvent(State.Time, SimEventType.TruckArrived, a: truck.Id, b: target.Id));
 
                 truck.ArrivedOnActiveTarget = true;
                 truck.State = TruckState.Idle;
@@ -213,7 +241,7 @@ namespace CoreSim.Sim
             if (customer.Status == CustomerStatus.Served)
             {
                 if (!truck.ArrivedOnActiveTarget)
-                    Queue.Enqueue(new SimEvent(State.Time, SimEventType.TruckArrived, a: truck.Id, b: target.Id));
+                    EmitEvent(new SimEvent(State.Time, SimEventType.TruckArrived, a: truck.Id, b: target.Id));
 
                 truck.ArrivedOnActiveTarget = true;
                 Warn($"Truck {truck.Id} attempted to serve already served customer {customer.Id}.");
@@ -228,7 +256,7 @@ namespace CoreSim.Sim
             }
 
             if (!truck.ArrivedOnActiveTarget)
-                Queue.Enqueue(new SimEvent(State.Time, SimEventType.TruckArrived, a: truck.Id, b: target.Id));
+                EmitEvent(new SimEvent(State.Time, SimEventType.TruckArrived, a: truck.Id, b: target.Id));
 
             truck.ArrivedOnActiveTarget = true;
             truck.TargetPos = null;
@@ -244,7 +272,7 @@ namespace CoreSim.Sim
             if (firstArrival)
             {
                 truck.ArrivedOnActiveTarget = true;
-                Queue.Enqueue(new SimEvent(State.Time, SimEventType.TruckArrived, a: truck.Id, b: target.Id));
+                EmitEvent(new SimEvent(State.Time, SimEventType.TruckArrived, a: truck.Id, b: target.Id));
             }
 
             truck.TargetPos = null;
@@ -331,7 +359,7 @@ namespace CoreSim.Sim
                 if (truck.Capacity > 0 && truck.Load > truck.Capacity)
                     Warn($"Truck {truck.Id} capacity exceeded. Load={truck.Load}, Capacity={truck.Capacity}.");
 
-                Queue.Enqueue(new SimEvent(State.Time, SimEventType.CustomerServed, a: truck.Id, b: customer.Id));
+                EmitEvent(new SimEvent(State.Time, SimEventType.CustomerServed, a: truck.Id, b: customer.Id));
             }
             else
             {
@@ -363,6 +391,14 @@ namespace CoreSim.Sim
         {
             System.Diagnostics.Debug.WriteLine(message);
             try { Console.WriteLine(message); } catch { }
+        }
+
+        private void EmitEvent(SimEvent e)
+        {
+            Queue.Enqueue(e);
+            _recentEvents.Add(e);
+            if (_recentEvents.Count > RecentEventsCapacity)
+                _recentEvents.RemoveAt(0);
         }
 
 #if DEBUG
