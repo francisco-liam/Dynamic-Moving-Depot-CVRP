@@ -22,6 +22,9 @@ public sealed class SimUI : MonoBehaviour
     public Toggle showRoutesToggle;
     public Toggle insertModeToggle;
 
+    private bool? _lastIsPlaying;
+    private bool? _lastInsertMode;
+
     private void Awake()
     {
         if (controller == null)
@@ -40,7 +43,27 @@ public sealed class SimUI : MonoBehaviour
         if (insertModeToggle != null) insertModeToggle.onValueChanged.AddListener(OnInsertModeChanged);
 
         RefreshLabels();
+        SyncToggleState();
         ApplyInsertDefaults();
+    }
+
+    private void Update()
+    {
+        if (controller == null)
+            controller = FindAnyObjectByType<SimViewController>();
+        if (inputController == null)
+            inputController = FindAnyObjectByType<SimInputController>();
+
+        bool isPlaying = controller != null && controller.IsPlaying;
+        bool insertMode = inputController != null && inputController.insertMode;
+
+        if (_lastIsPlaying != isPlaying || _lastInsertMode != insertMode)
+        {
+            RefreshLabels();
+            SyncToggleState();
+            _lastIsPlaying = isPlaying;
+            _lastInsertMode = insertMode;
+        }
     }
 
     private void OnDisable()
@@ -106,6 +129,14 @@ public sealed class SimUI : MonoBehaviour
 
         if (modeLabel != null)
             modeLabel.text = (inputController != null && inputController.insertMode) ? "Mode: Insert" : "Mode: Normal";
+    }
+
+    private void SyncToggleState()
+    {
+        if (insertModeToggle == null || inputController == null)
+            return;
+
+        insertModeToggle.SetIsOnWithoutNotify(inputController.insertMode);
     }
 
     private void ApplyInsertDefaults()

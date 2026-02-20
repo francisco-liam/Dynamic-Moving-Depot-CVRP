@@ -10,6 +10,7 @@ public sealed class SimViewController : MonoBehaviour
     [Header("References")]
     public SimBootstrap bootstrap;
     public SimRenderer simRenderer;
+    public SimCameraController cameraController;
 
     [Header("Instance")]
     public string instancePath = "";
@@ -41,6 +42,8 @@ public sealed class SimViewController : MonoBehaviour
             bootstrap = FindAnyObjectByType<SimBootstrap>();
         if (simRenderer == null)
             simRenderer = FindAnyObjectByType<SimRenderer>();
+        if (cameraController == null)
+            cameraController = FindAnyObjectByType<SimCameraController>();
     }
 
     private void Start()
@@ -139,6 +142,9 @@ public sealed class SimViewController : MonoBehaviour
 
         if (simRenderer != null)
             simRenderer.SetState(State);
+
+        if (cameraController != null && cameraController.autoFrameOnReset)
+            cameraController.FrameState(State);
     }
 
     private string ResolveInstancePath(string path)

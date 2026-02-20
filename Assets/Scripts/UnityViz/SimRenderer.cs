@@ -150,6 +150,9 @@ public sealed class SimRenderer : MonoBehaviour
             var c = _state.Customers[i];
             var r = _customers[i];
 
+            if (!r.GameObject.activeSelf)
+                r.GameObject.SetActive(true);
+
             r.GameObject.transform.position = UnityVec.ToUnity(c.Pos);
             if (r.GameObject.name != $"Customer {c.Id}")
                 r.GameObject.name = $"Customer {c.Id}";
