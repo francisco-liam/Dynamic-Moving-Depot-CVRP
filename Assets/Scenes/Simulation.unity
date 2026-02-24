@@ -1197,7 +1197,7 @@ MonoBehaviour:
   useRandomSeed: 0
   enableLogging: 1
   minLogLevel: 1
-  printSimTime: 1
+  printSimTime: 0
   simTimeScale: 1
 --- !u!4 &281199462
 Transform:
@@ -1836,8 +1836,10 @@ MonoBehaviour:
   playPauseButton: {fileID: 610888143}
   stepButton: {fileID: 562689434}
   resetButton: {fileID: 379629558}
+  replanNowButton: {fileID: 0}
   showRoutesToggle: {fileID: 653906431}
   insertModeToggle: {fileID: 1114096985}
+  autoReplanToggle: {fileID: 0}
 --- !u!1 &368962498
 GameObject:
   m_ObjectHideFlags: 0
@@ -6910,9 +6912,15 @@ MonoBehaviour:
   speedMultiplier: 1
   fixedStep: 0.1
   logEvents: 1
-  demoTruckCount: 3
+  demoTruckCount: 25
   autoAssignDemoPlan: 1
-  demoTargetsPerTruck: 3
+  demoTargetsPerTruck: 4
+  autoReplan: 1
+  replanPeriodicInterval: 2
+  replanMinGap: 1
+  commitmentLockK: 1
+  replanRespectCapacity: 1
+  replanRespectReleaseTime: 1
 --- !u!4 &1527486287
 Transform:
   m_ObjectHideFlags: 0
@@ -7786,9 +7794,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Event Feed
-
-'
+  m_text: 
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}

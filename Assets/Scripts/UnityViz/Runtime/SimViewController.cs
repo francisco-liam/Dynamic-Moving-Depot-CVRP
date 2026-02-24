@@ -3,6 +3,7 @@ using UnityEngine;
 using CoreSim;
 using CoreSim.IO;
 using CoreSim.Model;
+using CoreSim.Planning;
 using CoreSim.Sim;
 
 public sealed class SimViewController : MonoBehaviour
@@ -28,8 +29,17 @@ public sealed class SimViewController : MonoBehaviour
     public bool autoAssignDemoPlan = true;
     public int demoTargetsPerTruck = 3;
 
+    [Header("Auto Replan")]
+    public bool autoReplan = true;
+    public float replanPeriodicInterval = 2f;
+    public float replanMinGap = 1f;
+    public int commitmentLockK = 1;
+    public bool replanRespectCapacity = true;
+    public bool replanRespectReleaseTime = true;
+
     public SimState State { get; private set; }
     public Simulation Simulation { get; private set; }
+    public ReplanController ReplanController { get; private set; }
     public bool IsPlaying => _isPlaying;
 
     private bool _isPlaying;
@@ -66,6 +76,7 @@ public sealed class SimViewController : MonoBehaviour
             while (_accumulator >= fixedStep)
             {
                 Simulation.Step(fixedStep);
+                ReplanController?.Step(Simulation);
                 _accumulator -= fixedStep;
             }
 
@@ -86,9 +97,29 @@ public sealed class SimViewController : MonoBehaviour
     {
         if (Simulation == null) return;
         Simulation.Step(fixedStep);
+        ReplanController?.Step(Simulation);
         LogNewEvents();
         if (simRenderer != null && State != null)
             simRenderer.Render(State);
+    }
+
+    public void SetAutoReplan(bool enabled)
+    {
+        autoReplan = enabled;
+        if (ReplanController != null)
+            ReplanController.AutoReplanEnabled = enabled;
+    }
+
+    public void ReplanNow()
+    {
+        if (Simulation == null)
+            return;
+
+        if (ReplanController == null)
+            EnsureReplanController();
+
+        if (ReplanController != null)
+            ReplanController.ReplanNow(Simulation);
     }
 
     public void SetSpeedMultiplier(float value)
@@ -137,6 +168,8 @@ public sealed class SimViewController : MonoBehaviour
             AssignDemoPlans(State, demoTargetsPerTruck);
 
         Simulation = new Simulation(State);
+        EnsureReplanController();
+        ReplanController?.Reset(Simulation);
         _accumulator = 0f;
         _lastEventCount = 0;
 
@@ -208,5 +241,18 @@ public sealed class SimViewController : MonoBehaviour
             Debug.Log($"[SimEvent] {events[i]}");
 
         _lastEventCount = events.Count;
+    }
+
+    private void EnsureReplanController()
+    {
+        if (ReplanController == null)
+            ReplanController = new ReplanController(new BaselinePlanner());
+
+        ReplanController.AutoReplanEnabled = autoReplan;
+        ReplanController.PeriodicInterval = Mathf.Max(0f, replanPeriodicInterval);
+        ReplanController.MinTimeBetweenReplans = Mathf.Max(0f, replanMinGap);
+        ReplanController.CommitmentLockK = Mathf.Max(0, commitmentLockK);
+        ReplanController.RespectCapacity = replanRespectCapacity;
+        ReplanController.RespectReleaseTime = replanRespectReleaseTime;
     }
 }

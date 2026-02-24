@@ -19,11 +19,14 @@ public sealed class SimUI : MonoBehaviour
     public Button playPauseButton;
     public Button stepButton;
     public Button resetButton;
+    public Button replanNowButton;
     public Toggle showRoutesToggle;
     public Toggle insertModeToggle;
+    public Toggle autoReplanToggle;
 
     private bool? _lastIsPlaying;
     private bool? _lastInsertMode;
+    private bool? _lastAutoReplan;
 
     private void Awake()
     {
@@ -38,9 +41,11 @@ public sealed class SimUI : MonoBehaviour
         if (playPauseButton != null) playPauseButton.onClick.AddListener(OnPlayPauseClicked);
         if (stepButton != null) stepButton.onClick.AddListener(OnStepClicked);
         if (resetButton != null) resetButton.onClick.AddListener(OnResetClicked);
+        if (replanNowButton != null) replanNowButton.onClick.AddListener(OnReplanNowClicked);
         if (speedDropdown != null) speedDropdown.onValueChanged.AddListener(OnSpeedChanged);
         if (showRoutesToggle != null) showRoutesToggle.onValueChanged.AddListener(OnShowRoutesChanged);
         if (insertModeToggle != null) insertModeToggle.onValueChanged.AddListener(OnInsertModeChanged);
+        if (autoReplanToggle != null) autoReplanToggle.onValueChanged.AddListener(OnAutoReplanChanged);
 
         RefreshLabels();
         SyncToggleState();
@@ -56,13 +61,15 @@ public sealed class SimUI : MonoBehaviour
 
         bool isPlaying = controller != null && controller.IsPlaying;
         bool insertMode = inputController != null && inputController.insertMode;
+        bool autoReplan = controller != null && controller.autoReplan;
 
-        if (_lastIsPlaying != isPlaying || _lastInsertMode != insertMode)
+        if (_lastIsPlaying != isPlaying || _lastInsertMode != insertMode || _lastAutoReplan != autoReplan)
         {
             RefreshLabels();
             SyncToggleState();
             _lastIsPlaying = isPlaying;
             _lastInsertMode = insertMode;
+            _lastAutoReplan = autoReplan;
         }
     }
 
@@ -71,9 +78,11 @@ public sealed class SimUI : MonoBehaviour
         if (playPauseButton != null) playPauseButton.onClick.RemoveListener(OnPlayPauseClicked);
         if (stepButton != null) stepButton.onClick.RemoveListener(OnStepClicked);
         if (resetButton != null) resetButton.onClick.RemoveListener(OnResetClicked);
+        if (replanNowButton != null) replanNowButton.onClick.RemoveListener(OnReplanNowClicked);
         if (speedDropdown != null) speedDropdown.onValueChanged.RemoveListener(OnSpeedChanged);
         if (showRoutesToggle != null) showRoutesToggle.onValueChanged.RemoveListener(OnShowRoutesChanged);
         if (insertModeToggle != null) insertModeToggle.onValueChanged.RemoveListener(OnInsertModeChanged);
+        if (autoReplanToggle != null) autoReplanToggle.onValueChanged.RemoveListener(OnAutoReplanChanged);
     }
 
     private void OnPlayPauseClicked()
@@ -99,6 +108,12 @@ public sealed class SimUI : MonoBehaviour
         string path = instancePathInput != null ? instancePathInput.text : controller.instancePath;
         controller.ResetSim(seed, path);
         RefreshLabels();
+        SyncToggleState();
+    }
+
+    private void OnReplanNowClicked()
+    {
+        controller?.ReplanNow();
     }
 
     private void OnSpeedChanged(int index)
@@ -122,6 +137,11 @@ public sealed class SimUI : MonoBehaviour
         RefreshLabels();
     }
 
+    private void OnAutoReplanChanged(bool value)
+    {
+        controller?.SetAutoReplan(value);
+    }
+
     private void RefreshLabels()
     {
         if (controller == null || playPauseLabel == null) return;
@@ -134,9 +154,16 @@ public sealed class SimUI : MonoBehaviour
     private void SyncToggleState()
     {
         if (insertModeToggle == null || inputController == null)
+        {
+            if (autoReplanToggle != null && controller != null)
+                autoReplanToggle.SetIsOnWithoutNotify(controller.autoReplan);
             return;
+        }
 
         insertModeToggle.SetIsOnWithoutNotify(inputController.insertMode);
+
+        if (autoReplanToggle != null && controller != null)
+            autoReplanToggle.SetIsOnWithoutNotify(controller.autoReplan);
     }
 
     private void ApplyInsertDefaults()
