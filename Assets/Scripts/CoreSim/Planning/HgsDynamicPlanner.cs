@@ -132,6 +132,8 @@ namespace CoreSim.Planning
                     totalAssignedCustomers += 1;
                 }
 
+                AppendDepotReturn(fullPlan);
+
                 result.TruckPlans[truck.Id] = fullPlan;
             }
 
@@ -442,6 +444,18 @@ namespace CoreSim.Planning
             if (value < min) return min;
             if (value > max) return max;
             return value;
+        }
+
+        private static void AppendDepotReturn(List<TargetRef> plan)
+        {
+            if (plan.Count == 0)
+                return;
+
+            var last = plan[plan.Count - 1];
+            if (last.Type == TargetType.Depot)
+                return;
+
+            plan.Add(TargetRef.Depot());
         }
     }
 }

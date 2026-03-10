@@ -73,3 +73,7 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# HGS-Dynamic-CVRP local build outputs
+/[Aa]ssets/HGS-Dynamic-CVRP/build/
+/[Aa]ssets/HGS-Dynamic-CVRP/build-win/

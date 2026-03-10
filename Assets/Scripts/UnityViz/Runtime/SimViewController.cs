@@ -1,4 +1,5 @@
 using System.IO;
+using System.Collections.Generic;
 using UnityEngine;
 using CoreSim;
 using CoreSim.IO;
@@ -20,8 +21,10 @@ public sealed class SimViewController : MonoBehaviour
     [Header("Run Settings")]
     public int seed = 12345;
     public bool autoPlay = true;
+    public bool runStartupReplan = true;
     public float speedMultiplier = 1f;
     public float fixedStep = 0.1f;
+    public int maxSimStepsPerFrame = 50;
     public bool logEvents = true;
 
     [Header("Demo Fleet")]
@@ -54,6 +57,7 @@ public sealed class SimViewController : MonoBehaviour
     private float _accumulator;
     private int _lastEventCount;
     private string _resolvedInstancePath = string.Empty;
+    private string _resolvedSolverExecutablePath = string.Empty;
 
     private void Awake()
     {
@@ -82,12 +86,18 @@ public sealed class SimViewController : MonoBehaviour
             float dt = Time.deltaTime * Mathf.Max(0f, speedMultiplier);
             _accumulator += dt;
 
-            while (_accumulator >= fixedStep)
+            int steps = 0;
+            int stepCap = Mathf.Max(1, maxSimStepsPerFrame);
+            while (_accumulator >= fixedStep && steps < stepCap)
             {
                 Simulation.Step(fixedStep);
                 ReplanController?.Step(Simulation);
                 _accumulator -= fixedStep;
+                steps += 1;
             }
+
+            if (steps >= stepCap)
+                _accumulator = 0f;
 
             LogNewEvents();
         }
@@ -157,6 +167,7 @@ public sealed class SimViewController : MonoBehaviour
         seed = newSeed;
         string resolvedPath = ResolveInstancePath(path);
         _resolvedInstancePath = resolvedPath;
+        _resolvedSolverExecutablePath = ResolveSolverExecutablePath(solverExecutablePath);
 
         if (bootstrap != null)
             bootstrap.SimReset(seed, resolvedPath);
@@ -183,8 +194,8 @@ public sealed class SimViewController : MonoBehaviour
 
         EnsureReplanController();
         ReplanController?.Reset(Simulation);
-        // Explicit startup planning pass so initial behavior does not depend on demo timing.
-        ReplanController?.ReplanNow(Simulation);
+        if (runStartupReplan)
+            ReplanController?.ReplanNow(Simulation);
         _accumulator = 0f;
         _lastEventCount = 0;
 
@@ -210,6 +221,64 @@ public sealed class SimViewController : MonoBehaviour
             return candidate;
 
         return path;
+    }
+
+    private string ResolveSolverExecutablePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return path;
+
+        var nameVariants = BuildExecutableNameVariants(path);
+
+        for (int i = 0; i < nameVariants.Count; i++)
+        {
+            string variant = nameVariants[i];
+
+            if (Path.IsPathRooted(variant))
+            {
+                if (File.Exists(variant))
+                    return variant;
+
+                continue;
+            }
+
+            string cwdCandidate = Path.Combine(Directory.GetCurrentDirectory(), variant);
+            if (File.Exists(cwdCandidate))
+                return cwdCandidate;
+
+            string projectRoot = Directory.GetParent(Application.dataPath)?.FullName;
+            if (!string.IsNullOrEmpty(projectRoot))
+            {
+                string rootCandidate = Path.Combine(projectRoot, variant);
+                if (File.Exists(rootCandidate))
+                    return rootCandidate;
+
+                string[] commonBuildRoots =
+                {
+                    Path.Combine(projectRoot, "Assets", "HGS-Dynamic-CVRP", "build-win"),
+                    Path.Combine(projectRoot, "Assets", "HGS-Dynamic-CVRP", "build")
+                };
+
+                for (int b = 0; b < commonBuildRoots.Length; b++)
+                {
+                    string candidate = Path.Combine(commonBuildRoots[b], variant);
+                    if (File.Exists(candidate))
+                        return candidate;
+                }
+            }
+        }
+
+        return path;
+    }
+
+    private static List<string> BuildExecutableNameVariants(string path)
+    {
+        var values = new List<string>(2) { path };
+
+        if (Path.GetExtension(path).Length == 0)
+            values.Add(path + ".exe");
+
+        return values;
     }
 
     private static void AssignDemoPlans(SimState state, int targetsPerTruck)
@@ -265,12 +334,14 @@ public sealed class SimViewController : MonoBehaviour
         {
             planner = new HgsDynamicPlanner
             {
-                SolverExecutablePath = solverExecutablePath,
+                SolverExecutablePath = _resolvedSolverExecutablePath,
                 InstancePath = _resolvedInstancePath,
                 SolverTimeBudgetSeconds = Mathf.Max(0f, solverTimeBudgetSeconds),
                 ProcessOverheadBufferSeconds = Mathf.Max(0f, processOverheadBufferSeconds),
                 SafetyMarginSeconds = Mathf.Max(0f, safetyMarginSeconds)
             };
+
+            Debug.Log($"[HGS] solver path resolved: {_resolvedSolverExecutablePath}");
         }
         else
         {
