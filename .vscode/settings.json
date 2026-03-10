@@ -67,5 +67,5 @@
         "*.sln": "*.csproj",
     },
     "dotnet.defaultSolution": "Dynamic-Moving-Depot-CVRP.sln",
-    "github.copilot.chat.useWorkspaceContext": false
+    "github.copilot.chat.newWorkspace.useContext7": false
 }

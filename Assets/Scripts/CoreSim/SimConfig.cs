@@ -40,6 +40,32 @@ namespace CoreSim
         /// </summary>
         public int PlannerTimeBudgetMs { get; set; } = 50;
 
+        /// <summary>
+        /// Executable path for the dynamic HGS solver.
+        /// Can be absolute, relative to working dir, or available on PATH.
+        /// </summary>
+        public string SolverExecutablePath { get; set; } = "hgs_dynamic";
+
+        /// <summary>
+        /// Solver compute budget in simulated seconds used by HGS dynamic replanning.
+        /// </summary>
+        public float SolverTimeBudgetSeconds { get; set; } = 1.0f;
+
+        /// <summary>
+        /// Additional process startup / IO / parse buffer in seconds.
+        /// </summary>
+        public float ProcessOverheadBufferSeconds { get; set; } = 0.25f;
+
+        /// <summary>
+        /// Extra safety margin before commitment boundary in seconds.
+        /// </summary>
+        public float SafetyMarginSeconds { get; set; } = 0.25f;
+
+        /// <summary>
+        /// If true, replanning can trigger based on time-to-next-lock-boundary.
+        /// </summary>
+        public bool EnableEarlyLockReplan { get; set; } = true;
+
         // --- Optional overrides (experiment knobs) ---
         /// <summary>
         /// If set, overrides the truck speed defined by the instance.

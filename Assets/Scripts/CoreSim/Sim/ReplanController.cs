@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using CoreSim.Events;
+using CoreSim.Math;
 using CoreSim.Model;
 using CoreSim.Planning;
 
@@ -15,6 +16,10 @@ namespace CoreSim.Sim
         public int CommitmentLockK { get; set; } = 1;
         public bool RespectCapacity { get; set; } = true;
         public bool RespectReleaseTime { get; set; } = true;
+        public bool EnableEarlyLockReplan { get; set; } = true;
+        public float SolverTimeBudgetSeconds { get; set; } = 1.0f;
+        public float ProcessOverheadBufferSeconds { get; set; } = 0.25f;
+        public float SafetyMarginSeconds { get; set; } = 0.25f;
 
         public float LastReplanTime { get; private set; } = float.NegativeInfinity;
         public string LastSummary { get; private set; } = string.Empty;
@@ -52,6 +57,7 @@ namespace CoreSim.Sim
 
             ObserveEvents(simulation, now);
             ObservePeriodic(now);
+            ObserveEarlyLockBoundary(simulation, now);
 
             if (!AutoReplanEnabled)
                 return false;
@@ -129,6 +135,137 @@ namespace CoreSim.Sim
         {
             _pendingReplan = true;
             _pendingReason = AppendReason(_pendingReason, reason);
+        }
+
+        private void ObserveEarlyLockBoundary(Simulation simulation, float now)
+        {
+            if (!EnableEarlyLockReplan)
+                return;
+
+            var state = simulation.State;
+            if (state == null || state.Trucks.Count == 0)
+                return;
+
+            float minTimeToNextLock = float.PositiveInfinity;
+            for (int i = 0; i < state.Trucks.Count; i++)
+            {
+                float t = EstimateTimeToNextLockBoundary(state, state.Trucks[i]);
+                if (t < minTimeToNextLock)
+                    minTimeToNextLock = t;
+            }
+
+            if (float.IsPositiveInfinity(minTimeToNextLock))
+                return;
+
+            float plannerLeadTime = System.Math.Max(0f, SolverTimeBudgetSeconds)
+                                  + System.Math.Max(0f, ProcessOverheadBufferSeconds)
+                                  + System.Math.Max(0f, SafetyMarginSeconds);
+
+            if (minTimeToNextLock <= plannerLeadTime)
+            {
+                bool alreadyQueued = _pendingReason.Contains("EarlyLock", StringComparison.Ordinal);
+                QueueReplan("EarlyLock");
+
+                if (!alreadyQueued)
+                {
+                    Console.WriteLine(
+                        $"[Replan] Early lock trigger at t={now:0.###}: min_time_to_next_lock={minTimeToNextLock:0.###}, planner_lead_time={plannerLeadTime:0.###}");
+                }
+            }
+        }
+
+        private int GetConservativeLockTargetCount(Truck truck)
+        {
+            int currentIndex = Clamp(truck.CurrentTargetIndex, 0, truck.Plan.Count);
+            int remaining = truck.Plan.Count - currentIndex;
+            return remaining > 0 ? System.Math.Min(remaining, 1 + System.Math.Max(0, CommitmentLockK)) : 0;
+        }
+
+        private float EstimateTimeToNextLockBoundary(SimState state, Truck truck)
+        {
+            int lockTargetCount = GetConservativeLockTargetCount(truck);
+            if (lockTargetCount <= 0)
+                return float.PositiveInfinity;
+
+            int currentIndex = Clamp(truck.CurrentTargetIndex, 0, truck.Plan.Count);
+            float total = 0f;
+            int remainingLockedTargets = lockTargetCount;
+            Vec2 currentPos = truck.Pos;
+
+            if (truck.State == TruckState.Servicing)
+            {
+                total += System.Math.Max(0f, truck.ServiceRemaining);
+
+                var servicingCustomer = state.GetCustomerById(truck.ServicingCustomerId);
+                if (servicingCustomer != null)
+                    currentPos = servicingCustomer.Pos;
+
+                currentIndex += 1;
+                remainingLockedTargets -= 1;
+            }
+
+            for (int i = currentIndex; i < truck.Plan.Count && remainingLockedTargets > 0; i++)
+            {
+                var target = truck.Plan[i];
+                if (!TryResolveTargetPos(state, target, out Vec2 targetPos))
+                    return 0f;
+
+                float speed = System.Math.Max(0f, truck.Speed);
+                if (speed <= 0f)
+                    return 0f;
+
+                float legDistance = Vec2.Distance(currentPos, targetPos);
+                total += legDistance / speed;
+
+                if (target.Type == TargetType.Customer)
+                {
+                    var customer = state.GetCustomerById(target.Id);
+                    if (customer != null)
+                        total += System.Math.Max(0f, customer.ServiceTime);
+                }
+
+                currentPos = targetPos;
+                remainingLockedTargets -= 1;
+            }
+
+            if (remainingLockedTargets > 0)
+                return float.PositiveInfinity;
+
+            return total;
+        }
+
+        private static bool TryResolveTargetPos(SimState state, TargetRef target, out Vec2 pos)
+        {
+            if (target.Type == TargetType.Depot)
+            {
+                pos = state.Depot.Pos;
+                return true;
+            }
+
+            if (target.Type == TargetType.Customer)
+            {
+                var customer = state.GetCustomerById(target.Id);
+                if (customer != null)
+                {
+                    pos = customer.Pos;
+                    return true;
+                }
+
+                pos = default;
+                return false;
+            }
+
+            if (target.Type == TargetType.Station)
+            {
+                if (state.StationPositions.TryGetValue(target.Id, out var stationPos))
+                {
+                    pos = stationPos;
+                    return true;
+                }
+            }
+
+            pos = default;
+            return false;
         }
 
         private bool TryReplan(Simulation simulation, float now, bool force)

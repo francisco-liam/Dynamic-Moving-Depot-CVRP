@@ -37,6 +37,14 @@ public sealed class SimViewController : MonoBehaviour
     public bool replanRespectCapacity = true;
     public bool replanRespectReleaseTime = true;
 
+    [Header("Planner")]
+    public bool useHgsDynamicPlanner = false;
+    public string solverExecutablePath = "hgs_dynamic";
+    public float solverTimeBudgetSeconds = 1.0f;
+    public float processOverheadBufferSeconds = 0.25f;
+    public float safetyMarginSeconds = 0.25f;
+    public bool enableEarlyLockReplan = true;
+
     public SimState State { get; private set; }
     public Simulation Simulation { get; private set; }
     public ReplanController ReplanController { get; private set; }
@@ -45,6 +53,7 @@ public sealed class SimViewController : MonoBehaviour
     private bool _isPlaying;
     private float _accumulator;
     private int _lastEventCount;
+    private string _resolvedInstancePath = string.Empty;
 
     private void Awake()
     {
@@ -147,6 +156,7 @@ public sealed class SimViewController : MonoBehaviour
     {
         seed = newSeed;
         string resolvedPath = ResolveInstancePath(path);
+        _resolvedInstancePath = resolvedPath;
 
         if (bootstrap != null)
             bootstrap.SimReset(seed, resolvedPath);
@@ -250,8 +260,24 @@ public sealed class SimViewController : MonoBehaviour
 
     private void EnsureReplanController()
     {
-        if (ReplanController == null)
-            ReplanController = new ReplanController(new BaselinePlanner());
+        IPlanner planner;
+        if (useHgsDynamicPlanner)
+        {
+            planner = new HgsDynamicPlanner
+            {
+                SolverExecutablePath = solverExecutablePath,
+                InstancePath = _resolvedInstancePath,
+                SolverTimeBudgetSeconds = Mathf.Max(0f, solverTimeBudgetSeconds),
+                ProcessOverheadBufferSeconds = Mathf.Max(0f, processOverheadBufferSeconds),
+                SafetyMarginSeconds = Mathf.Max(0f, safetyMarginSeconds)
+            };
+        }
+        else
+        {
+            planner = new BaselinePlanner();
+        }
+
+        ReplanController = new ReplanController(planner);
 
         ReplanController.AutoReplanEnabled = autoReplan;
         ReplanController.PeriodicInterval = Mathf.Max(0f, replanPeriodicInterval);
@@ -259,5 +285,9 @@ public sealed class SimViewController : MonoBehaviour
         ReplanController.CommitmentLockK = Mathf.Max(0, commitmentLockK);
         ReplanController.RespectCapacity = replanRespectCapacity;
         ReplanController.RespectReleaseTime = replanRespectReleaseTime;
+        ReplanController.EnableEarlyLockReplan = enableEarlyLockReplan;
+        ReplanController.SolverTimeBudgetSeconds = Mathf.Max(0f, solverTimeBudgetSeconds);
+        ReplanController.ProcessOverheadBufferSeconds = Mathf.Max(0f, processOverheadBufferSeconds);
+        ReplanController.SafetyMarginSeconds = Mathf.Max(0f, safetyMarginSeconds);
     }
 }
