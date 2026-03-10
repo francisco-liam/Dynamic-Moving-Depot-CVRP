@@ -17,11 +17,48 @@ namespace CoreSim.Sim
         private readonly List<SimEvent> _recentEvents = new List<SimEvent>();
 
         private readonly float _arriveEpsilon;
+        private bool _initializedAtCurrentTime;
 
         public Simulation(SimState state, float arriveEpsilon = 0.1f)
         {
             State = state;
             _arriveEpsilon = arriveEpsilon;
+        }
+
+        /// <summary>
+        /// One-time startup normalization at current State.Time.
+        /// Rule: releaseTime &lt;= now means Waiting (unless already InService/Served),
+        /// releaseTime &gt; now means Unreleased.
+        /// Optionally emits one CustomerReleased event per eligible customer for consistent
+        /// event-driven initialization and startup replanning behavior.
+        /// </summary>
+        public void InitializeAtCurrentTime(bool emitInitialReleaseEvents = true)
+        {
+            if (_initializedAtCurrentTime)
+                return;
+
+            float now = State.Time;
+            for (int i = 0; i < State.Customers.Count; i++)
+            {
+                var customer = State.Customers[i];
+                bool releasedNow = customer.ReleaseTime <= now;
+
+                if (releasedNow)
+                {
+                    bool canRelease = customer.Status != CustomerStatus.Served && customer.Status != CustomerStatus.InService;
+                    if (canRelease)
+                        customer.Status = CustomerStatus.Waiting;
+
+                    if (emitInitialReleaseEvents && canRelease)
+                        EmitEvent(new SimEvent(now, SimEventType.CustomerReleased, a: customer.Id));
+                }
+                else if (customer.Status == CustomerStatus.Waiting)
+                {
+                    customer.Status = CustomerStatus.Unreleased;
+                }
+            }
+
+            _initializedAtCurrentTime = true;
         }
 
         public Customer InsertCustomer(CustomerSpec spec)
@@ -255,6 +292,18 @@ namespace CoreSim.Sim
                 return true;
             }
 
+            if (WouldExceedCapacity(truck, customer))
+            {
+                if (!truck.ArrivedOnActiveTarget)
+                    EmitEvent(new SimEvent(State.Time, SimEventType.TruckArrived, a: truck.Id, b: target.Id));
+
+                truck.ArrivedOnActiveTarget = true;
+                truck.TargetPos = null;
+                truck.TargetId = -1;
+                HandleCapacityBlockedService(truck, customer, advancePlan: true);
+                return true;
+            }
+
             if (!truck.ArrivedOnActiveTarget)
                 EmitEvent(new SimEvent(State.Time, SimEventType.TruckArrived, a: truck.Id, b: target.Id));
 
@@ -315,6 +364,12 @@ namespace CoreSim.Sim
                     return;
                 }
 
+                if (WouldExceedCapacity(truck, customer))
+                {
+                    HandleCapacityBlockedService(truck, customer, advancePlan: true);
+                    return;
+                }
+
                 StartService(truck, customer);
                 return;
             }
@@ -338,6 +393,29 @@ namespace CoreSim.Sim
                 CompleteService(truck);
         }
 
+        private static bool WouldExceedCapacity(Truck truck, Customer customer)
+        {
+            if (truck.Capacity <= 0)
+                return false;
+
+            return truck.Load + customer.Demand > truck.Capacity;
+        }
+
+        private void HandleCapacityBlockedService(Truck truck, Customer customer, bool advancePlan)
+        {
+            customer.Status = CustomerStatus.Waiting;
+            customer.AssignedTruckId = null;
+
+            Warn($"Truck {truck.Id} cannot serve customer {customer.Id}: load {truck.Load} + demand {customer.Demand} exceeds capacity {truck.Capacity}.");
+
+            truck.State = TruckState.Idle;
+            truck.ServiceRemaining = 0f;
+            truck.ServicingCustomerId = -1;
+
+            if (advancePlan)
+                AdvancePlan(truck);
+        }
+
         private void UpdateService(Truck truck, float dt)
         {
             if (truck.ServicingCustomerId < 0)
@@ -356,8 +434,6 @@ namespace CoreSim.Sim
                 customer.Status = CustomerStatus.Served;
                 customer.AssignedTruckId = truck.Id;
                 truck.Load += customer.Demand;
-                if (truck.Capacity > 0 && truck.Load > truck.Capacity)
-                    Warn($"Truck {truck.Id} capacity exceeded. Load={truck.Load}, Capacity={truck.Capacity}.");
 
                 EmitEvent(new SimEvent(State.Time, SimEventType.CustomerServed, a: truck.Id, b: customer.Id));
             }

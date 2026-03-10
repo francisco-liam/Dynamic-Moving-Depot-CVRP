@@ -58,18 +58,30 @@ namespace CoreSim.IO
 
             // Customers: all nodes except depot nodes
             var depotSet = new HashSet<int>(dto.DepotNodeIds.Count > 0 ? dto.DepotNodeIds : new List<int> { 1 });
+            float defaultServiceTime = cfg.DefaultCustomerServiceTime ?? 0f;
 
             for (int nodeId = 1; nodeId <= dto.Dimension; nodeId++)
             {
                 if (depotSet.Contains(nodeId))
                     continue;
 
+                // Policy:
+                // 1) Use per-customer SERVICE_TIME_SECTION values when present.
+                // 2) Else use instance-level default service-time header if present.
+                // 3) Else use SimConfig.DefaultCustomerServiceTime.
+                // 4) Else 0.
+                float mappedServiceTime;
+                if (dto.HasExplicitServiceTimes && nodeId < dto.ServiceTime.Length)
+                    mappedServiceTime = dto.ServiceTime[nodeId];
+                else
+                    mappedServiceTime = dto.DefaultServiceTime ?? defaultServiceTime;
+
                 var c = new Customer(
                     id: nodeId,
                     pos: dto.NodePos[nodeId],
                     demand: dto.Demand[nodeId],
                     releaseTime: dto.ReleaseTime[nodeId],
-                    serviceTime: 0f
+                    serviceTime: mappedServiceTime
                 );
 
                 // initial status based on time=0

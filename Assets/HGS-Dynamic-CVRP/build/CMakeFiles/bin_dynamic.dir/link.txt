@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/bin_dynamic.dir/Program/dynamic_main.cpp.o -o hgs_dynamic  libhgscvrp_static.a

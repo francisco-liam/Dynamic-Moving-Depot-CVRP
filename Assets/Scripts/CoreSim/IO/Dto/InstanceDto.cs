@@ -28,6 +28,9 @@ namespace CoreSim.IO
         public Vec2[] NodePos { get; set; } = new Vec2[0];
         public int[] Demand { get; set; } = new int[0];
         public float[] ReleaseTime { get; set; } = new float[0];
+        public float[] ServiceTime { get; set; } = new float[0];
+        public float? DefaultServiceTime { get; set; } = null;
+        public bool HasExplicitServiceTimes { get; set; } = false;
 
         public List<int> DepotNodeIds { get; set; } = new List<int>();
 

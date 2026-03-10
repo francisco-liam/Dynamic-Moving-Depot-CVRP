@@ -168,8 +168,13 @@ public sealed class SimViewController : MonoBehaviour
             AssignDemoPlans(State, demoTargetsPerTruck);
 
         Simulation = new Simulation(State);
+        // Normalize t=0 semantics once and emit one-time initial release events.
+        Simulation.InitializeAtCurrentTime(emitInitialReleaseEvents: true);
+
         EnsureReplanController();
         ReplanController?.Reset(Simulation);
+        // Explicit startup planning pass so initial behavior does not depend on demo timing.
+        ReplanController?.ReplanNow(Simulation);
         _accumulator = 0f;
         _lastEventCount = 0;
 

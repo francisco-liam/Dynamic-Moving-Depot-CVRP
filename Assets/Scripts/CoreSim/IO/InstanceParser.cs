@@ -14,6 +14,7 @@ namespace CoreSim.IO
         private const string DEMAND_SECTION = "DEMAND_SECTION";
         private const string DEPOT_SECTION = "DEPOT_SECTION";
         private const string RELEASE_TIME_SECTION = "RELEASE_TIME_SECTION";
+        private const string SERVICE_TIME_SECTION = "SERVICE_TIME_SECTION";
 
         private const string DEPOT_STOP_SECTION = "DEPOT_STOP_SECTION";
         private const string DEPOT_CANDIDATE_STOP_SECTION = "DEPOT_CANDIDATE_STOP_SECTION";
@@ -38,6 +39,7 @@ namespace CoreSim.IO
             var coords = new Dictionary<int, Vec2>();
             var demands = new Dictionary<int, int>();
             var releaseTimes = new Dictionary<int, float>();
+            var serviceTimes = new Dictionary<int, float>();
 
             var depotStops = new List<DepotStopDto>();
             var depotNodeIds = new List<int>();
@@ -45,6 +47,7 @@ namespace CoreSim.IO
 
             bool sawDemandSection = false;
             bool sawReleaseSection = false;
+            bool sawServiceTimeSection = false;
             bool sawDepotStopSection = false;
             bool sawStationsSection = false;
 
@@ -75,6 +78,7 @@ namespace CoreSim.IO
 
                     if (currentSection == DEMAND_SECTION) sawDemandSection = true;
                     if (currentSection == RELEASE_TIME_SECTION) sawReleaseSection = true;
+                    if (currentSection == SERVICE_TIME_SECTION) sawServiceTimeSection = true;
                     if (currentSection == DEPOT_STOP_SECTION || currentSection == DEPOT_CANDIDATE_STOP_SECTION) sawDepotStopSection = true;
                     if (currentSection == STATIONS_COORD_SECTION) sawStationsSection = true;
 
@@ -117,6 +121,20 @@ namespace CoreSim.IO
                     {
                         float rt = ParseFloat(t[1]);
                         releaseTimes[id] = rt;
+                    }
+                    continue;
+                }
+
+                if (currentSection == SERVICE_TIME_SECTION)
+                {
+                    // <id> <serviceTime> (optional terminator -1)
+                    var t = Tok(line);
+                    if (t.Length >= 1 && t[0] == "-1") { currentSection = ""; continue; }
+
+                    if (t.Length >= 2 && int.TryParse(t[0], out int id))
+                    {
+                        float st = ParseFloat(t[1]);
+                        serviceTimes[id] = st;
                     }
                     continue;
                 }
@@ -186,13 +204,17 @@ namespace CoreSim.IO
             dto.NodePos = new Vec2[dto.Dimension + 1];
             dto.Demand = new int[dto.Dimension + 1];
             dto.ReleaseTime = new float[dto.Dimension + 1];
+            dto.ServiceTime = new float[dto.Dimension + 1];
 
             for (int i = 1; i <= dto.Dimension; i++)
             {
                 dto.NodePos[i] = coords.TryGetValue(i, out var p) ? p : new Vec2(0, 0);
                 dto.Demand[i] = demands.TryGetValue(i, out var d) ? d : 0;
                 dto.ReleaseTime[i] = releaseTimes.TryGetValue(i, out var r) ? r : 0f;
+                dto.ServiceTime[i] = serviceTimes.TryGetValue(i, out var st) ? st : 0f;
             }
+
+            dto.HasExplicitServiceTimes = sawServiceTimeSection;
 
             dto.DepotNodeIds = depotNodeIds.Count > 0 ? depotNodeIds : new List<int> { 1 };
 
@@ -309,6 +331,7 @@ namespace CoreSim.IO
                 case DEMAND_SECTION:
                 case DEPOT_SECTION:
                 case RELEASE_TIME_SECTION:
+                case SERVICE_TIME_SECTION:
                 case DEPOT_STOP_SECTION:
                 case DEPOT_CANDIDATE_STOP_SECTION:
                 case STATIONS_COORD_SECTION:
@@ -380,6 +403,10 @@ namespace CoreSim.IO
                     break;
                 case "VEHICLES":
                     dto.VehiclesHeader = (int)ParseFloat(value);
+                    break;
+                case "SERVICE_TIME":
+                case "DEFAULT_SERVICE_TIME":
+                    dto.DefaultServiceTime = ParseFloat(value);
                     break;
 
                 default:

@@ -1,0 +1,230 @@
+{
+  "difficulty": "medium",
+  "top_k": 10,
+  "ranking_metric": "slack_per_vehicle",
+  "rows": [
+    {
+      "instance": "X-n143-k7",
+      "vehicle_count": 7,
+      "capacity": 1190,
+      "slack": 855,
+      "slack_per_vehicle": 122.14285714285714,
+      "added_demand_budget": 513,
+      "max_route_excess_capacity": 843,
+      "avg_route_excess_capacity": 122.14285714285714,
+      "max_possible_new_customers": 513
+    },
+    {
+      "instance": "X-n459-k26",
+      "vehicle_count": 26,
+      "capacity": 1106,
+      "slack": 321,
+      "slack_per_vehicle": 12.346153846153847,
+      "added_demand_budget": 192,
+      "max_route_excess_capacity": 82,
+      "avg_route_excess_capacity": 12.346153846153847,
+      "max_possible_new_customers": 192
+    },
+    {
+      "instance": "X-n573-k30",
+      "vehicle_count": 30,
+      "capacity": 210,
+      "slack": 128,
+      "slack_per_vehicle": 4.266666666666667,
+      "added_demand_budget": 76,
+      "max_route_excess_capacity": 113,
+      "avg_route_excess_capacity": 4.266666666666667,
+      "max_possible_new_customers": 76
+    },
+    {
+      "instance": "X-n749-k98",
+      "vehicle_count": 98,
+      "capacity": 396,
+      "slack": 394,
+      "slack_per_vehicle": 4.020408163265306,
+      "added_demand_budget": 236,
+      "max_route_excess_capacity": 141,
+      "avg_route_excess_capacity": 4.020408163265306,
+      "max_possible_new_customers": 236
+    },
+    {
+      "instance": "X-n685-k75",
+      "vehicle_count": 75,
+      "capacity": 408,
+      "slack": 301,
+      "slack_per_vehicle": 4.013333333333334,
+      "added_demand_budget": 180,
+      "max_route_excess_capacity": 48,
+      "avg_route_excess_capacity": 4.013333333333334,
+      "max_possible_new_customers": 180
+    },
+    {
+      "instance": "X-n351-k40",
+      "vehicle_count": 40,
+      "capacity": 436,
+      "slack": 123,
+      "slack_per_vehicle": 3.075,
+      "added_demand_budget": 73,
+      "max_route_excess_capacity": 38,
+      "avg_route_excess_capacity": 3.075,
+      "max_possible_new_customers": 73
+    },
+    {
+      "instance": "X-n214-k11",
+      "vehicle_count": 11,
+      "capacity": 944,
+      "slack": 28,
+      "slack_per_vehicle": 2.5454545454545454,
+      "added_demand_budget": 16,
+      "max_route_excess_capacity": 7,
+      "avg_route_excess_capacity": 2.5454545454545454,
+      "max_possible_new_customers": 16
+    },
+    {
+      "instance": "X-n819-k171",
+      "vehicle_count": 171,
+      "capacity": 358,
+      "slack": 304,
+      "slack_per_vehicle": 1.7777777777777777,
+      "added_demand_budget": 182,
+      "max_route_excess_capacity": 116,
+      "avg_route_excess_capacity": 3.8488372093023258,
+      "max_possible_new_customers": 182
+    },
+    {
+      "instance": "X-n1001-k43",
+      "vehicle_count": 43,
+      "capacity": 131,
+      "slack": 76,
+      "slack_per_vehicle": 1.7674418604651163,
+      "added_demand_budget": 45,
+      "max_route_excess_capacity": 67,
+      "avg_route_excess_capacity": 1.7674418604651163,
+      "max_possible_new_customers": 45
+    },
+    {
+      "instance": "X-n916-k207",
+      "vehicle_count": 207,
+      "capacity": 33,
+      "slack": 15,
+      "slack_per_vehicle": 0.07246376811594203,
+      "added_demand_budget": 9,
+      "max_route_excess_capacity": 4,
+      "avg_route_excess_capacity": 0.07246376811594203,
+      "max_possible_new_customers": 9
+    }
+  ],
+  "top_rows": [
+    {
+      "instance": "X-n143-k7",
+      "vehicle_count": 7,
+      "capacity": 1190,
+      "slack": 855,
+      "slack_per_vehicle": 122.14285714285714,
+      "added_demand_budget": 513,
+      "max_route_excess_capacity": 843,
+      "avg_route_excess_capacity": 122.14285714285714,
+      "max_possible_new_customers": 513
+    },
+    {
+      "instance": "X-n459-k26",
+      "vehicle_count": 26,
+      "capacity": 1106,
+      "slack": 321,
+      "slack_per_vehicle": 12.346153846153847,
+      "added_demand_budget": 192,
+      "max_route_excess_capacity": 82,
+      "avg_route_excess_capacity": 12.346153846153847,
+      "max_possible_new_customers": 192
+    },
+    {
+      "instance": "X-n573-k30",
+      "vehicle_count": 30,
+      "capacity": 210,
+      "slack": 128,
+      "slack_per_vehicle": 4.266666666666667,
+      "added_demand_budget": 76,
+      "max_route_excess_capacity": 113,
+      "avg_route_excess_capacity": 4.266666666666667,
+      "max_possible_new_customers": 76
+    },
+    {
+      "instance": "X-n749-k98",
+      "vehicle_count": 98,
+      "capacity": 396,
+      "slack": 394,
+      "slack_per_vehicle": 4.020408163265306,
+      "added_demand_budget": 236,
+      "max_route_excess_capacity": 141,
+      "avg_route_excess_capacity": 4.020408163265306,
+      "max_possible_new_customers": 236
+    },
+    {
+      "instance": "X-n685-k75",
+      "vehicle_count": 75,
+      "capacity": 408,
+      "slack": 301,
+      "slack_per_vehicle": 4.013333333333334,
+      "added_demand_budget": 180,
+      "max_route_excess_capacity": 48,
+      "avg_route_excess_capacity": 4.013333333333334,
+      "max_possible_new_customers": 180
+    },
+    {
+      "instance": "X-n351-k40",
+      "vehicle_count": 40,
+      "capacity": 436,
+      "slack": 123,
+      "slack_per_vehicle": 3.075,
+      "added_demand_budget": 73,
+      "max_route_excess_capacity": 38,
+      "avg_route_excess_capacity": 3.075,
+      "max_possible_new_customers": 73
+    },
+    {
+      "instance": "X-n214-k11",
+      "vehicle_count": 11,
+      "capacity": 944,
+      "slack": 28,
+      "slack_per_vehicle": 2.5454545454545454,
+      "added_demand_budget": 16,
+      "max_route_excess_capacity": 7,
+      "avg_route_excess_capacity": 2.5454545454545454,
+      "max_possible_new_customers": 16
+    },
+    {
+      "instance": "X-n819-k171",
+      "vehicle_count": 171,
+      "capacity": 358,
+      "slack": 304,
+      "slack_per_vehicle": 1.7777777777777777,
+      "added_demand_budget": 182,
+      "max_route_excess_capacity": 116,
+      "avg_route_excess_capacity": 3.8488372093023258,
+      "max_possible_new_customers": 182
+    },
+    {
+      "instance": "X-n1001-k43",
+      "vehicle_count": 43,
+      "capacity": 131,
+      "slack": 76,
+      "slack_per_vehicle": 1.7674418604651163,
+      "added_demand_budget": 45,
+      "max_route_excess_capacity": 67,
+      "avg_route_excess_capacity": 1.7674418604651163,
+      "max_possible_new_customers": 45
+    },
+    {
+      "instance": "X-n916-k207",
+      "vehicle_count": 207,
+      "capacity": 33,
+      "slack": 15,
+      "slack_per_vehicle": 0.07246376811594203,
+      "added_demand_budget": 9,
+      "max_route_excess_capacity": 4,
+      "avg_route_excess_capacity": 0.07246376811594203,
+      "max_possible_new_customers": 9
+    }
+  ],
+  "skipped": []
+}
