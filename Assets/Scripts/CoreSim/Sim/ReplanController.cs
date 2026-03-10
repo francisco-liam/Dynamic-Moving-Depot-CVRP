@@ -34,8 +34,10 @@ namespace CoreSim.Sim
         public void Reset(Simulation? simulation)
         {
             _lastSeenEventCount = 0;
-            _pendingReplan = false;
-            _pendingReason = string.Empty;
+            // Queue an initial replan so the first Step() call computes a plan even if
+            // no CustomerReleased events fire in that tick (e.g. all release times > 0).
+            _pendingReplan = true;
+            _pendingReason = "Initialize";
             LastSummary = string.Empty;
 
             float now = simulation?.State?.Time ?? 0f;

@@ -40,6 +40,7 @@ public sealed class LoadInstanceDemo : MonoBehaviour
             AssignDemoPlan(state);
 
         var sim = new Simulation(state);
+        sim.Initialize(); // Emit t=0 CustomerReleased events before stepping.
         for (int i = 0; i < 10; i++)
             sim.Step(1f);
 

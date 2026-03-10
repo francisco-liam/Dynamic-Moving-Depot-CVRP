@@ -64,12 +64,19 @@ namespace CoreSim.IO
                 if (depotSet.Contains(nodeId))
                     continue;
 
+                // Service time policy:
+                // If the parsed DTO contains an explicit value (>= 0) for this node, use it.
+                // Otherwise fall back to SimConfig.DefaultServiceTime (default 0f = instantaneous).
+                float serviceTime = (dto.ServiceTime.Length > nodeId && dto.ServiceTime[nodeId] >= 0f)
+                    ? dto.ServiceTime[nodeId]
+                    : cfg.DefaultServiceTime;
+
                 var c = new Customer(
                     id: nodeId,
                     pos: dto.NodePos[nodeId],
                     demand: dto.Demand[nodeId],
                     releaseTime: dto.ReleaseTime[nodeId],
-                    serviceTime: 0f
+                    serviceTime: serviceTime
                 );
 
                 // initial status based on time=0

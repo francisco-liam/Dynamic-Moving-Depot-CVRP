@@ -1,0 +1,13 @@
+{
+  "base_instance": "X-n219-k73",
+  "seed": 149,
+  "vehicle_count": 73,
+  "capacity": 3,
+  "original_cost": 117595.0,
+  "augmented_static_cost": null,
+  "safe_reveal_horizon": 98.08321791298265,
+  "added_demand_budget": 0,
+  "total_added_demand": 0,
+  "batch_times": {},
+  "new_customers": []
+}

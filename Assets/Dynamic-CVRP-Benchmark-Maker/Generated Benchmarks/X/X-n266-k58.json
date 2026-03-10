@@ -1,0 +1,26 @@
+{
+  "base_instance": "X-n266-k58",
+  "seed": 159,
+  "vehicle_count": 58,
+  "capacity": 35,
+  "original_cost": 75478.0,
+  "augmented_static_cost": null,
+  "safe_reveal_horizon": 157.09702144511087,
+  "added_demand_budget": 9,
+  "total_added_demand": 6,
+  "batch_times": {
+    "1": 78.54851072255543
+  },
+  "new_customers": [
+    {
+      "id": 267,
+      "parent_id": 203,
+      "x": 136.24950790731762,
+      "y": 59.692017137347115,
+      "demand": 6,
+      "inherited_phase": 0.7914875889625733,
+      "batch_id": 1,
+      "reveal_time": 78.54851072255543
+    }
+  ]
+}

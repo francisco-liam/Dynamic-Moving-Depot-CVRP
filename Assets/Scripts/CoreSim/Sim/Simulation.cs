@@ -24,6 +24,23 @@ namespace CoreSim.Sim
             _arriveEpsilon = arriveEpsilon;
         }
 
+        /// <summary>
+        /// Must be called once after construction, before the first Step().
+        /// Emits CustomerReleased for every customer that begins in Waiting state (releaseTime &lt;= 0).
+        /// This gives event-driven subscribers (e.g. ReplanController) a consistent release signal
+        /// at t=0 — identical to the signal they would receive had those customers been released
+        /// dynamically during simulation.
+        /// </summary>
+        public void Initialize()
+        {
+            for (int i = 0; i < State.Customers.Count; i++)
+            {
+                var c = State.Customers[i];
+                if (c.Status == CustomerStatus.Waiting)
+                    EmitEvent(new SimEvent(State.Time, SimEventType.CustomerReleased, a: c.Id));
+            }
+        }
+
         public Customer InsertCustomer(CustomerSpec spec)
         {
             int nextId = 1;
@@ -327,6 +344,18 @@ namespace CoreSim.Sim
 
         private void StartService(Truck truck, Customer customer)
         {
+            // CVRP capacity enforcement: do not start service if this customer's demand
+            // would push the truck over capacity. The customer remains Waiting so a
+            // replanner can assign it to a truck with remaining capacity.
+            if (truck.Capacity > 0 && truck.Load + customer.Demand > truck.Capacity)
+            {
+                Warn($"Truck {truck.Id} cannot serve customer {customer.Id}: " +
+                     $"load={truck.Load} + demand={customer.Demand} > capacity={truck.Capacity}. " +
+                     "Customer remains Waiting.");
+                AdvancePlan(truck);
+                return;
+            }
+
             customer.Status = CustomerStatus.InService;
             customer.AssignedTruckId = truck.Id;
 
@@ -356,8 +385,10 @@ namespace CoreSim.Sim
                 customer.Status = CustomerStatus.Served;
                 customer.AssignedTruckId = truck.Id;
                 truck.Load += customer.Demand;
+                // Safety net: StartService already prevents over-capacity service, so this
+                // should be unreachable. Kept as a defensive invariant check.
                 if (truck.Capacity > 0 && truck.Load > truck.Capacity)
-                    Warn($"Truck {truck.Id} capacity exceeded. Load={truck.Load}, Capacity={truck.Capacity}.");
+                    Warn($"Truck {truck.Id} capacity exceeded after serving customer {customer.Id}. Load={truck.Load}, Capacity={truck.Capacity}.");
 
                 EmitEvent(new SimEvent(State.Time, SimEventType.CustomerServed, a: truck.Id, b: customer.Id));
             }

@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/bin.dir/Program/main.cpp.o -o hgs  libhgscvrp_static.a

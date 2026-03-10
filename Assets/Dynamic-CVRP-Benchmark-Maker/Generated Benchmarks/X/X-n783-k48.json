@@ -1,0 +1,88 @@
+{
+  "base_instance": "X-n783-k48",
+  "seed": 212,
+  "vehicle_count": 48,
+  "capacity": 832,
+  "original_cost": 72386.0,
+  "augmented_static_cost": null,
+  "safe_reveal_horizon": 236.41313591562545,
+  "added_demand_budget": 313,
+  "total_added_demand": 313,
+  "batch_times": {
+    "1": 59.10328397890636,
+    "2": 118.20656795781272,
+    "3": 177.3098519367191
+  },
+  "new_customers": [
+    {
+      "id": 784,
+      "parent_id": 407,
+      "x": 584.7683593315293,
+      "y": 996.1360625248509,
+      "demand": 81,
+      "inherited_phase": 1.0,
+      "batch_id": 1,
+      "reveal_time": 59.10328397890636
+    },
+    {
+      "id": 785,
+      "parent_id": 62,
+      "x": 788.2852531241746,
+      "y": 820.952974592884,
+      "demand": 80,
+      "inherited_phase": 1.0,
+      "batch_id": 1,
+      "reveal_time": 59.10328397890636
+    },
+    {
+      "id": 786,
+      "parent_id": 48,
+      "x": 928.6559570680415,
+      "y": 629.8930001353059,
+      "demand": 88,
+      "inherited_phase": 1.0,
+      "batch_id": 1,
+      "reveal_time": 59.10328397890636
+    },
+    {
+      "id": 787,
+      "parent_id": 536,
+      "x": 411.27844370065674,
+      "y": 749.921453552449,
+      "demand": 23,
+      "inherited_phase": 1.0,
+      "batch_id": 2,
+      "reveal_time": 118.20656795781272
+    },
+    {
+      "id": 788,
+      "parent_id": 73,
+      "x": 917.4565714637553,
+      "y": 338.0801958898878,
+      "demand": 32,
+      "inherited_phase": 1.0,
+      "batch_id": 2,
+      "reveal_time": 118.20656795781272
+    },
+    {
+      "id": 789,
+      "parent_id": 773,
+      "x": 665.666966433632,
+      "y": 94.0241236361335,
+      "demand": 7,
+      "inherited_phase": 1.0,
+      "batch_id": 3,
+      "reveal_time": 177.3098519367191
+    },
+    {
+      "id": 790,
+      "parent_id": 75,
+      "x": 425.03445870088416,
+      "y": 869.0212787359743,
+      "demand": 2,
+      "inherited_phase": 1.0,
+      "batch_id": 3,
+      "reveal_time": 177.3098519367191
+    }
+  ]
+}

@@ -168,6 +168,7 @@ public sealed class SimViewController : MonoBehaviour
             AssignDemoPlans(State, demoTargetsPerTruck);
 
         Simulation = new Simulation(State);
+        Simulation.Initialize(); // Emit t=0 CustomerReleased events for all initially-available customers.
         EnsureReplanController();
         ReplanController?.Reset(Simulation);
         _accumulator = 0f;

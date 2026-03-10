@@ -1,0 +1,108 @@
+{
+  "base_instance": "X-n749-k98",
+  "seed": 210,
+  "vehicle_count": 98,
+  "capacity": 396,
+  "original_cost": 77269.0,
+  "augmented_static_cost": null,
+  "safe_reveal_horizon": 61.47418000418967,
+  "added_demand_budget": 236,
+  "total_added_demand": 235,
+  "batch_times": {
+    "1": 15.368545001047417,
+    "2": 30.737090002094835,
+    "3": 46.105635003142254
+  },
+  "new_customers": [
+    {
+      "id": 750,
+      "parent_id": 395,
+      "x": 231.59561457235398,
+      "y": 305.6977507026733,
+      "demand": 57,
+      "inherited_phase": 1.0,
+      "batch_id": 1,
+      "reveal_time": 15.368545001047417
+    },
+    {
+      "id": 751,
+      "parent_id": 417,
+      "x": 534.2961408183277,
+      "y": 502.2140638296968,
+      "demand": 33,
+      "inherited_phase": 1.0,
+      "batch_id": 1,
+      "reveal_time": 15.368545001047417
+    },
+    {
+      "id": 752,
+      "parent_id": 236,
+      "x": 505.2927796782301,
+      "y": 7.188342787755748,
+      "demand": 24,
+      "inherited_phase": 1.0,
+      "batch_id": 1,
+      "reveal_time": 15.368545001047417
+    },
+    {
+      "id": 753,
+      "parent_id": 696,
+      "x": 610.0168485042008,
+      "y": 648.3921252188163,
+      "demand": 33,
+      "inherited_phase": 1.0,
+      "batch_id": 2,
+      "reveal_time": 30.737090002094835
+    },
+    {
+      "id": 754,
+      "parent_id": 549,
+      "x": 766.0534549953343,
+      "y": 962.2479921229899,
+      "demand": 24,
+      "inherited_phase": 1.0,
+      "batch_id": 2,
+      "reveal_time": 30.737090002094835
+    },
+    {
+      "id": 755,
+      "parent_id": 144,
+      "x": 199.0597011151126,
+      "y": 383.4758451319431,
+      "demand": 48,
+      "inherited_phase": 1.0,
+      "batch_id": 2,
+      "reveal_time": 30.737090002094835
+    },
+    {
+      "id": 756,
+      "parent_id": 511,
+      "x": 784.5943055928976,
+      "y": 463.2544558853092,
+      "demand": 9,
+      "inherited_phase": 1.0,
+      "batch_id": 3,
+      "reveal_time": 46.105635003142254
+    },
+    {
+      "id": 757,
+      "parent_id": 332,
+      "x": 206.59452715129916,
+      "y": 384.7018511592826,
+      "demand": 2,
+      "inherited_phase": 1.0,
+      "batch_id": 3,
+      "reveal_time": 46.105635003142254
+    },
+    {
+      "id": 758,
+      "parent_id": 692,
+      "x": 787.2224805985188,
+      "y": 342.2368618648703,
+      "demand": 5,
+      "inherited_phase": 1.0,
+      "batch_id": 3,
+      "reveal_time": 46.105635003142254
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "base_instance": "X-n655-k131",
+  "seed": 204,
+  "vehicle_count": 131,
+  "capacity": 5,
+  "original_cost": 106780.0,
+  "augmented_static_cost": null,
+  "safe_reveal_horizon": 163.0745823268434,
+  "added_demand_budget": 0,
+  "total_added_demand": 0,
+  "batch_times": {},
+  "new_customers": []
+}

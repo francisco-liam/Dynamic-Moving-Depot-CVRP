@@ -14,6 +14,7 @@ namespace CoreSim.IO
         private const string DEMAND_SECTION = "DEMAND_SECTION";
         private const string DEPOT_SECTION = "DEPOT_SECTION";
         private const string RELEASE_TIME_SECTION = "RELEASE_TIME_SECTION";
+        private const string SERVICE_TIME_SECTION = "SERVICE_TIME_SECTION";
 
         private const string DEPOT_STOP_SECTION = "DEPOT_STOP_SECTION";
         private const string DEPOT_CANDIDATE_STOP_SECTION = "DEPOT_CANDIDATE_STOP_SECTION";
@@ -38,6 +39,7 @@ namespace CoreSim.IO
             var coords = new Dictionary<int, Vec2>();
             var demands = new Dictionary<int, int>();
             var releaseTimes = new Dictionary<int, float>();
+            var serviceTimes = new Dictionary<int, float>();
 
             var depotStops = new List<DepotStopDto>();
             var depotNodeIds = new List<int>();
@@ -121,6 +123,22 @@ namespace CoreSim.IO
                     continue;
                 }
 
+                if (currentSection == SERVICE_TIME_SECTION)
+                {
+                    // <id> <serviceTime>  (optional -1 terminator)
+                    // Service time is in simulated seconds. Depot node entry (demand=0) is parsed
+                    // but ignored during mapping. Missing nodes fall back to SimConfig.DefaultServiceTime.
+                    var t = Tok(line);
+                    if (t.Length >= 1 && t[0] == "-1") { currentSection = ""; continue; }
+
+                    if (t.Length >= 2 && int.TryParse(t[0], out int id))
+                    {
+                        float st = ParseFloat(t[1]);
+                        serviceTimes[id] = st;
+                    }
+                    continue;
+                }
+
                 if (currentSection == DEPOT_STOP_SECTION || currentSection == DEPOT_CANDIDATE_STOP_SECTION)
                 {
                     // Option B: <stop_id> <x> <y> (optional terminator -1)
@@ -186,12 +204,16 @@ namespace CoreSim.IO
             dto.NodePos = new Vec2[dto.Dimension + 1];
             dto.Demand = new int[dto.Dimension + 1];
             dto.ReleaseTime = new float[dto.Dimension + 1];
+            // serviceTimes: only set for nodes where SERVICE_TIME_SECTION provided a value;
+            // nodes not listed here fall back to SimConfig.DefaultServiceTime during mapping.
+            dto.ServiceTime = new float[dto.Dimension + 1];
 
             for (int i = 1; i <= dto.Dimension; i++)
             {
                 dto.NodePos[i] = coords.TryGetValue(i, out var p) ? p : new Vec2(0, 0);
                 dto.Demand[i] = demands.TryGetValue(i, out var d) ? d : 0;
                 dto.ReleaseTime[i] = releaseTimes.TryGetValue(i, out var r) ? r : 0f;
+                dto.ServiceTime[i] = serviceTimes.TryGetValue(i, out var st) ? st : -1f; // -1 sentinel = not set
             }
 
             dto.DepotNodeIds = depotNodeIds.Count > 0 ? depotNodeIds : new List<int> { 1 };
@@ -309,6 +331,7 @@ namespace CoreSim.IO
                 case DEMAND_SECTION:
                 case DEPOT_SECTION:
                 case RELEASE_TIME_SECTION:
+                case SERVICE_TIME_SECTION:
                 case DEPOT_STOP_SECTION:
                 case DEPOT_CANDIDATE_STOP_SECTION:
                 case STATIONS_COORD_SECTION:

@@ -29,6 +29,10 @@ namespace CoreSim.IO
         public int[] Demand { get; set; } = new int[0];
         public float[] ReleaseTime { get; set; } = new float[0];
 
+        // Per-customer service durations (simulated seconds). Populated from SERVICE_TIME_SECTION
+        // if present; otherwise all entries remain 0f and InstanceMapper applies SimConfig.DefaultServiceTime.
+        public float[] ServiceTime { get; set; } = new float[0];
+
         public List<int> DepotNodeIds { get; set; } = new List<int>();
 
         // Moving depot candidate stops (your format)

@@ -53,6 +53,13 @@ namespace CoreSim
         /// </summary>
         public float? OverrideDepotSpeed { get; set; } = null;
 
+        /// <summary>
+        /// Fallback service time (simulated seconds) used when an instance file does not
+        /// include a SERVICE_TIME_SECTION for a given customer node.
+        /// Set to 0f for instantaneous service (no dwell).
+        /// </summary>
+        public float DefaultServiceTime { get; set; } = 0f;
+
         // --- Optional: travel model toggles (future-proofing) ---
         /// <summary>
         /// If true, travel is computed as Euclidean distance in XZ plane.

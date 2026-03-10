@@ -1,0 +1,78 @@
+{
+  "base_instance": "X-n190-k8",
+  "seed": 143,
+  "vehicle_count": 8,
+  "capacity": 138,
+  "original_cost": 16980.0,
+  "augmented_static_cost": null,
+  "safe_reveal_horizon": 785.4223251233855,
+  "added_demand_budget": 36,
+  "total_added_demand": 36,
+  "batch_times": {
+    "1": 196.35558128084637,
+    "2": 392.71116256169273,
+    "3": 589.0667438425392
+  },
+  "new_customers": [
+    {
+      "id": 196,
+      "parent_id": 157,
+      "x": 457.0402903509637,
+      "y": 372.0657718331224,
+      "demand": 3,
+      "inherited_phase": 0.8117291140509781,
+      "batch_id": 1,
+      "reveal_time": 196.35558128084637
+    },
+    {
+      "id": 194,
+      "parent_id": 27,
+      "x": 380.140268965482,
+      "y": 494.11028448469216,
+      "demand": 7,
+      "inherited_phase": 0.8431701071113789,
+      "batch_id": 1,
+      "reveal_time": 196.35558128084637
+    },
+    {
+      "id": 191,
+      "parent_id": 49,
+      "x": 862.7498573629019,
+      "y": 564.2754462385045,
+      "demand": 1,
+      "inherited_phase": 1.0,
+      "batch_id": 2,
+      "reveal_time": 392.71116256169273
+    },
+    {
+      "id": 192,
+      "parent_id": 23,
+      "x": 819.6985571074395,
+      "y": 509.4743005451512,
+      "demand": 9,
+      "inherited_phase": 1.0,
+      "batch_id": 2,
+      "reveal_time": 392.71116256169273
+    },
+    {
+      "id": 193,
+      "parent_id": 34,
+      "x": 808.7895182265156,
+      "y": 653.0402067972225,
+      "demand": 8,
+      "inherited_phase": 1.0,
+      "batch_id": 3,
+      "reveal_time": 589.0667438425392
+    },
+    {
+      "id": 195,
+      "parent_id": 165,
+      "x": 795.5678857050234,
+      "y": 625.5398029670603,
+      "demand": 8,
+      "inherited_phase": 1.0,
+      "batch_id": 3,
+      "reveal_time": 589.0667438425392
+    }
+  ]
+}
