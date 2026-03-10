@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/home/liamf/ecsl/HGS-Dynamic-CVRP/build/cmake_install.cmake",
-		"/home/liamf/ecsl/HGS-Dynamic-CVRP/build/Test/Test-c/cmake_install.cmake"
-	],
-	"Parallel" : false
-}
