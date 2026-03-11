@@ -11,11 +11,13 @@ public sealed class BenchmarkBatchRunner : MonoBehaviour
 {
     [Header("References")]
     public SimViewController controller;
+    [Tooltip("Optional local-only config asset (Assets/LocalConfig/BenchmarkLocalConfig.asset). Gitignored — overrides selected fields without affecting committed scene values.")]
+    public BenchmarkLocalConfig localConfig;
 
     [Header("Run Mode")]
     public bool runOnStart = false;
-    public bool runAllBenchmarks = true;
-    public string singleScenarioFile = "X-n143-k7.json";
+    [Tooltip("Leave empty to run ALL benchmark scenarios. Add entries (e.g. 'X-n143-k7') to run a specific subset.")]
+    public string[] selectedScenarios = new string[0];
 
     [Header("Folders")]
     public string benchmarksFolder = "Assets/HGS-Dynamic-CVRP/Generated Benchmarks";
@@ -32,18 +34,29 @@ public sealed class BenchmarkBatchRunner : MonoBehaviour
     [Header("Dynamic Insert Settings")]
     public float insertedCustomerServiceTime = 1f;
 
+    [Header("Planner")]
+    [Tooltip("Wall-clock seconds given to the HGS solver each replan. Each batch gap is ~52 sim-seconds; 5–10 s is reasonable.")]
+    public float runSolverTimeBudgetSeconds = 5f;
+    [Tooltip("Disable periodic replanning so the solver only fires on batch-release CustomerReleased events.")]
+    public bool replanOnBatchReleaseOnly = true;
+    [Tooltip("Log the full solver command, stdout, stderr and keep temp artifacts in %TEMP%/dynamic-cvrp-hgs/ for inspection.")]
+    public bool debugSolverOutput = false;
+
     [Header("Visualization")]
     public bool forceShowRoutes = true;
-    public float runSpeedMultiplier = 20f;
+    [Tooltip("Sim-time multiplier. Set to 1 to run at 1 sim-unit per real second.")]
+    public float runSpeedMultiplier = 1f;
+    [Tooltip("Speed multiplier applied after the last dynamic batch has been inserted, to finish the run faster. 0 = no change.")]
+    public float postInsertSpeedMultiplier = 0f;
 
     [Header("Performance")]
     public bool disablePerEventLogs = true;
-    public float runFixedStep = 0.2f;
-    public int runMaxSimStepsPerFrame = 20;
+    public float runFixedStep = 0.05f;
+    public int runMaxSimStepsPerFrame = 4;
     public bool disableUiOverlaysDuringBatch = true;
 
     [Header("Vehicle")]
-    public float runTruckSpeedOverride = 12f;
+    public float runTruckSpeedOverride = 1f;
 
     [Header("Completion")]
     public float depotArrivalTolerance = 0.5f;
@@ -56,12 +69,61 @@ public sealed class BenchmarkBatchRunner : MonoBehaviour
     private int _nextInsertIndex;
     private bool _runActive;
     private bool _dynamicReplanActivated;
+    private bool _postInsertSpeedApplied;
     private Stopwatch _wallClock;
+    private string _batchTimestamp;
+
+    // ── Speed helpers ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Right-click the component in the Inspector and choose "Reset Speed to 1:1"
+    /// to snap all speed/step fields to 1 sim-unit = 1 real second.
+    /// Do this once after upgrading from an old serialized scene.
+    /// </summary>
+    [ContextMenu("Reset Speed to 1:1")]
+    public void ResetSpeedToOneToOne()
+    {
+        runSpeedMultiplier     = 1f;
+        runTruckSpeedOverride  = 1f;
+        runFixedStep           = 0.05f;
+        runMaxSimStepsPerFrame = 4;
+        UnityEngine.Debug.Log("[BenchmarkRunner] Speed reset to 1:1 (1 sim-unit = 1 real second).");
+
+        // Apply immediately if a run is active.
+        if (controller != null)
+        {
+            controller.SetSpeedMultiplier(runSpeedMultiplier);
+            controller.fixedStep           = runFixedStep;
+            controller.maxSimStepsPerFrame = runMaxSimStepsPerFrame;
+
+            if (controller.State != null)
+                for (int i = 0; i < controller.State.Trucks.Count; i++)
+                    controller.State.Trucks[i].Speed = runTruckSpeedOverride;
+        }
+    }
 
     private void Awake()
     {
         if (controller == null)
             controller = FindAnyObjectByType<SimViewController>();
+
+        // Tell the controller not to self-init in Start() — we own init.
+        if (controller != null)
+            controller.suppressAutoStart = true;
+
+        // Warn about multiple controllers that could conflict
+        var allControllers = FindObjectsByType<SimViewController>(FindObjectsSortMode.None);
+        if (allControllers.Length > 1)
+        {
+            UnityEngine.Debug.LogWarning($"[BenchmarkRunner] Found {allControllers.Length} SimViewController instances - this could cause conflicts!");
+            for (int i = 0; i < allControllers.Length; i++)
+                UnityEngine.Debug.Log($"[BenchmarkRunner] SimViewController[{i}]: {allControllers[i].gameObject.name}, enabled={allControllers[i].enabled}");
+        }
+
+        // Warn about LoadInstanceDemo that could interfere
+        var loadDemo = FindAnyObjectByType<LoadInstanceDemo>();
+        if (loadDemo != null)
+            UnityEngine.Debug.LogWarning($"[BenchmarkRunner] Found LoadInstanceDemo on {loadDemo.gameObject.name} - this may conflict!");
     }
 
     private void Start()
@@ -83,6 +145,26 @@ public sealed class BenchmarkBatchRunner : MonoBehaviour
             return;
 
         ProcessDueInsertions();
+
+        // Once all batches are consumed, optionally fast-forward to the end.
+        if (!_postInsertSpeedApplied
+            && postInsertSpeedMultiplier > 0f
+            && _pendingInserts.Count > 0
+            && _nextInsertIndex >= _pendingInserts.Count)
+        {
+            _postInsertSpeedApplied = true;
+            controller.SetSpeedMultiplier(postInsertSpeedMultiplier);
+            UnityEngine.Debug.Log($"[BenchmarkRunner] All batches inserted — speed set to {postInsertSpeedMultiplier}× to finish run faster.");
+        }
+
+        // Keep the hint current for periodic/EarlyLock replans that fire outside ProcessDueInsertions.
+        if (controller.ReplanController != null)
+        {
+            float nextSimTime = (_activeScenario != null && _nextInsertIndex < _pendingInserts.Count)
+                ? _pendingInserts[_nextInsertIndex].reveal_time
+                : float.PositiveInfinity;
+            controller.ReplanController.NextScheduledInsertionSimTime = nextSimTime;
+        }
 
         if (!IsRunComplete())
             return;
@@ -122,8 +204,18 @@ public sealed class BenchmarkBatchRunner : MonoBehaviour
         }
 
         var scenarioFiles = new List<string>();
-        if (runAllBenchmarks)
+
+        // localConfig override takes priority over the Inspector field.
+        string[] effectiveScenarios = (localConfig != null
+            && localConfig.selectedScenariosOverride != null
+            && localConfig.selectedScenariosOverride.Length > 0)
+            ? localConfig.selectedScenariosOverride
+            : selectedScenarios;
+
+        bool runAll = effectiveScenarios == null || effectiveScenarios.Length == 0;
+        if (runAll)
         {
+            // No filter — queue every valid scenario JSON in the folder.
             string[] candidates = Directory.GetFiles(benchmarkRoot, "*.json", SearchOption.TopDirectoryOnly);
             for (int i = 0; i < candidates.Length; i++)
             {
@@ -136,23 +228,40 @@ public sealed class BenchmarkBatchRunner : MonoBehaviour
         }
         else
         {
-            string scenarioPath = ResolveScenarioPath(benchmarkRoot, singleScenarioFile);
-            if (!File.Exists(scenarioPath))
+            // Queue only the explicitly selected scenarios, in order.
+            for (int i = 0; i < effectiveScenarios.Length; i++)
             {
-                UnityEngine.Debug.LogError($"[BenchmarkRunner] Scenario file not found: {scenarioPath}");
-                return;
-            }
+                string entry = (effectiveScenarios[i] ?? string.Empty).Trim();
+                if (string.IsNullOrEmpty(entry))
+                    continue;
 
-            if (!TryLoadScenario(scenarioPath, out _))
-            {
-                UnityEngine.Debug.LogError($"[BenchmarkRunner] Scenario JSON schema invalid: {scenarioPath}");
-                return;
-            }
+                // Accept bare name (X-n143-k7), with or without .json extension.
+                if (!entry.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                    entry += ".json";
 
-            scenarioFiles.Add(scenarioPath);
+                string scenarioPath = Path.IsPathRooted(entry)
+                    ? entry
+                    : Path.Combine(benchmarkRoot, entry);
+
+                if (!File.Exists(scenarioPath))
+                {
+                    UnityEngine.Debug.LogError($"[BenchmarkRunner] Selected scenario not found: {scenarioPath}");
+                    continue;
+                }
+
+                if (!TryLoadScenario(scenarioPath, out _))
+                {
+                    UnityEngine.Debug.LogError($"[BenchmarkRunner] Selected scenario has invalid schema: {scenarioPath}");
+                    continue;
+                }
+
+                scenarioFiles.Add(scenarioPath);
+            }
         }
 
         scenarioFiles.Sort(StringComparer.OrdinalIgnoreCase);
+
+        _batchTimestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
 
         int runCountPerScenario = System.Math.Max(1, runsPerBenchmark);
         var rng = new System.Random(unchecked(randomSeedBase ^ Environment.TickCount));
@@ -185,6 +294,14 @@ public sealed class BenchmarkBatchRunner : MonoBehaviour
         _pendingInserts.Clear();
         _nextInsertIndex = 0;
         _dynamicReplanActivated = false;
+        _postInsertSpeedApplied = false;
+
+        // Restore normal run speed before starting the next scenario.
+        float resetSpeed = (localConfig != null && localConfig.speedMultiplierOverride > 0f)
+            ? localConfig.speedMultiplierOverride
+            : runSpeedMultiplier;
+        if (resetSpeed > 0f)
+            controller.SetSpeedMultiplier(resetSpeed);
 
         if (_pendingRuns.Count == 0)
         {
@@ -220,8 +337,20 @@ public sealed class BenchmarkBatchRunner : MonoBehaviour
         if (forceHgsPlanner)
             controller.useHgsDynamicPlanner = true;
 
+        // Disable auto-replan entirely until first batch insertion fires it.
         if (forceAutoReplan)
             controller.autoReplan = false;
+
+        // Batch-release-only mode: no periodic ticks, no early-lock pre-emptive fire.
+        if (replanOnBatchReleaseOnly)
+        {
+            controller.replanPeriodicInterval = 0f;
+            controller.enableEarlyLockReplan = false;
+        }
+
+        // Wire solver time budget so the planner gets it on ResetSim.
+        if (runSolverTimeBudgetSeconds > 0f)
+            controller.solverTimeBudgetSeconds = runSolverTimeBudgetSeconds;
 
         if (_activeScenario.vehicle_count > 0)
             controller.demoTruckCount = _activeScenario.vehicle_count;
@@ -241,6 +370,13 @@ public sealed class BenchmarkBatchRunner : MonoBehaviour
         controller.runStartupReplan = false;
         controller.ResetSim(_activeWorkItem.Seed, instancePath);
 
+        // Propagate solver debug flags into the freshly-created HgsDynamicPlanner.
+        if (controller.ReplanController?.Planner is CoreSim.Planning.HgsDynamicPlanner hgsPlanner)
+        {
+            hgsPlanner.LogSolverOutput = debugSolverOutput
+                || (localConfig != null && (localConfig.logSolverOutput || localConfig.keepSolverArtifacts));
+        }
+
         if (runTruckSpeedOverride > 0f && controller.State != null)
         {
             for (int i = 0; i < controller.State.Trucks.Count; i++)
@@ -250,8 +386,11 @@ public sealed class BenchmarkBatchRunner : MonoBehaviour
         if (disableUiOverlaysDuringBatch)
             DisableUiOverlays();
 
-        if (runSpeedMultiplier > 0f)
-            controller.SetSpeedMultiplier(runSpeedMultiplier);
+        float effectiveSpeed = (localConfig != null && localConfig.speedMultiplierOverride > 0f)
+            ? localConfig.speedMultiplierOverride
+            : runSpeedMultiplier;
+        if (effectiveSpeed > 0f)
+            controller.SetSpeedMultiplier(effectiveSpeed);
 
         if (forceShowRoutes && controller.simRenderer != null)
             controller.simRenderer.SetShowRoutes(true);
@@ -284,11 +423,18 @@ public sealed class BenchmarkBatchRunner : MonoBehaviour
         controller.Play();
         _runActive = true;
 
-        UnityEngine.Debug.Log($"[BenchmarkRunner] Active instance={instancePath}");
-        UnityEngine.Debug.Log($"[BenchmarkRunner] State customers={controller.State.Customers.Count} trucks={controller.State.Trucks.Count}");
-        UnityEngine.Debug.Log($"[BenchmarkRunner] Truck speed override={runTruckSpeedOverride:0.###}");
+        // Effective sim rate: speedMultiplier × truckSpeed tells you how fast trucks
+        // actually traverse the map per real second.
+        float effectiveTruckRate = controller.speedMultiplier * runTruckSpeedOverride;
+        UnityEngine.Debug.Log(
+            $"[BenchmarkRunner] START {_activeWorkItem.BaseName} run={_activeWorkItem.RunIndex} seed={_activeWorkItem.Seed}\n" +
+            $"  instance     = {instancePath}\n" +
+            $"  customers    = {controller.State.Customers.Count}  trucks={controller.State.Trucks.Count}\n" +
+            $"  speedMult    = {controller.speedMultiplier}  truckSpeed={runTruckSpeedOverride}  → {effectiveTruckRate:0.###} units/real-sec\n" +
+            $"  fixedStep    = {controller.fixedStep}  maxStepsPerFrame={controller.maxSimStepsPerFrame}\n" +
+            $"  solverBudget = {runSolverTimeBudgetSeconds}s  batchReleaseOnly={replanOnBatchReleaseOnly}\n" +
+            "  NOTE: if units/real-sec != 1.0, right-click component → Reset Speed to 1:1");
         UnityEngine.Debug.Log("[BenchmarkRunner] AutoReplan is OFF until first dynamic insertion.");
-        UnityEngine.Debug.Log($"[BenchmarkRunner] Start {_activeWorkItem.BaseName} run={_activeWorkItem.RunIndex} seed={_activeWorkItem.Seed}");
     }
 
     private void ProcessDueInsertions()
@@ -298,6 +444,7 @@ public sealed class BenchmarkBatchRunner : MonoBehaviour
 
         float now = controller.State.Time;
 
+        bool anyInserted = false;
         while (_nextInsertIndex < _pendingInserts.Count)
         {
             var customer = _pendingInserts[_nextInsertIndex];
@@ -313,14 +460,31 @@ public sealed class BenchmarkBatchRunner : MonoBehaviour
 
             controller.InsertCustomer(spec);
             _nextInsertIndex += 1;
+            anyInserted = true;
+        }
 
-            if (!_dynamicReplanActivated && forceAutoReplan)
+        // Trigger a single replan for the whole batch after all insertions are done.
+        // (Calling ReplanNow inside the loop would invoke the solver once per customer.)
+        if (anyInserted && forceAutoReplan)
+        {
+            // Update the next-insertion hint BEFORE ReplanNow so ComputeDynamicBudget
+            // sees the correct future batch time, not the one we just consumed.
+            if (controller.ReplanController != null)
+            {
+                float nextSimTime = (_nextInsertIndex < _pendingInserts.Count)
+                    ? _pendingInserts[_nextInsertIndex].reveal_time
+                    : float.PositiveInfinity;
+                controller.ReplanController.NextScheduledInsertionSimTime = nextSimTime;
+            }
+
+            if (!_dynamicReplanActivated)
             {
                 controller.SetAutoReplan(true);
-                controller.ReplanNow();
                 _dynamicReplanActivated = true;
                 UnityEngine.Debug.Log($"[BenchmarkRunner] Dynamic replanning activated at sim t={now:0.###}");
             }
+            controller.ReplanNow();
+            UnityEngine.Debug.Log($"[BenchmarkRunner] Replan triggered for batch of {_nextInsertIndex} inserts at sim t={now:0.###}");
         }
     }
 
@@ -390,6 +554,7 @@ public sealed class BenchmarkBatchRunner : MonoBehaviour
             truck.ActiveTarget = null;
             truck.ArrivedOnActiveTarget = false;
             truck.State = TruckState.Idle;
+            truck.Load = 0;
             truck.ServiceRemaining = 0f;
             truck.ServicingCustomerId = -1;
         }
@@ -413,6 +578,19 @@ public sealed class BenchmarkBatchRunner : MonoBehaviour
                 truck.Plan.Add(TargetRef.Depot());
 
             UnityEngine.Debug.Log($"[BenchmarkRunner] Truck {truck.Id} seeded targets={truck.Plan.Count}");
+            
+            // Enhanced debug: Log truck state after seeding
+            UnityEngine.Debug.Log($"[BenchmarkRunner] Truck {truck.Id} state after seeding: Pos={truck.Pos}, Speed={truck.Speed}, CurrentTargetIndex={truck.CurrentTargetIndex}, HasPlanTarget={truck.HasPlanTarget}");
+            if (truck.Plan.Count > 0)
+            {
+                string planStr = "";
+                for (int j = 0; j < System.Math.Min(3, truck.Plan.Count); j++)
+                {
+                    var target = truck.Plan[j];
+                    planStr += $"{target.Type}:{target.Id} ";
+                }
+                UnityEngine.Debug.Log($"[BenchmarkRunner] Truck {truck.Id} first targets: {planStr}");
+            }
         }
 
         if (assignCount == 0)
@@ -494,8 +672,9 @@ public sealed class BenchmarkBatchRunner : MonoBehaviour
 
         string fileName = string.Format(
             CultureInfo.InvariantCulture,
-            "{0}_run{1:00}_seed{2}.sol",
+            "{0}_{1}_run{2:00}_seed{3}.sol",
             _activeWorkItem.BaseName,
+            _batchTimestamp ?? DateTime.Now.ToString("yyyyMMdd_HHmmss"),
             _activeWorkItem.RunIndex,
             _activeWorkItem.Seed);
 
@@ -578,17 +757,6 @@ public sealed class BenchmarkBatchRunner : MonoBehaviour
             return false;
 
         return true;
-    }
-
-    private static string ResolveScenarioPath(string benchmarkRoot, string scenarioFile)
-    {
-        if (string.IsNullOrWhiteSpace(scenarioFile))
-            return benchmarkRoot;
-
-        if (Path.IsPathRooted(scenarioFile))
-            return scenarioFile;
-
-        return Path.Combine(benchmarkRoot, scenarioFile);
     }
 
     private static string ResolvePath(string path)

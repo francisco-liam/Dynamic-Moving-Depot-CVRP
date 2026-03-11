@@ -77,3 +77,6 @@ crashlytics-build.properties
 # HGS-Dynamic-CVRP local build outputs
 /[Aa]ssets/HGS-Dynamic-CVRP/build/
 /[Aa]ssets/HGS-Dynamic-CVRP/build-win/
+
+# Local per-developer config assets (BenchmarkLocalConfig.asset etc.)
+/[Aa]ssets/LocalConfig/

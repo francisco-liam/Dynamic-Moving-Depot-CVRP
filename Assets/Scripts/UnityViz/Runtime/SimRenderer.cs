@@ -256,14 +256,14 @@ public sealed class SimRenderer : MonoBehaviour
 
     private void UpdateTruckRoutes(Truck truck, TruckRender render)
     {
-        if (!showRoutes || render.Route == null || render.LockedRoute == null)
+        if (!showRoutes || render.Route == null)
             return;
 
         int remaining = truck.Plan.Count - truck.CurrentTargetIndex;
         if (remaining <= 0)
         {
             render.Route.positionCount = 0;
-            render.LockedRoute.positionCount = 0;
+            if (render.LockedRoute != null) render.LockedRoute.positionCount = 0;
             return;
         }
 
@@ -271,7 +271,7 @@ public sealed class SimRenderer : MonoBehaviour
         int unlockedPoints = remaining - lockedCount;
 
         Vec2 lastPos = truck.Pos;
-        if (lockedCount > 0)
+        if (lockedCount > 0 && render.LockedRoute != null)
         {
             int lockedPoints = lockedCount + 1;
             EnsureBuffer(ref render.LockedBuffer, lockedPoints);
@@ -292,7 +292,7 @@ public sealed class SimRenderer : MonoBehaviour
             for (int i = 0; i < lockedIndex; i++)
                 render.LockedRoute.SetPosition(i, render.LockedBuffer[i]);
         }
-        else
+        else if (render.LockedRoute != null)
         {
             render.LockedRoute.positionCount = 0;
         }

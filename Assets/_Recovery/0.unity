@@ -6451,6 +6451,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1301807046}
   - component: {fileID: 1301807045}
+  - component: {fileID: 1301807047}
   m_Layer: 0
   m_Name: Benchmark Batch Runner
   m_TagString: Untagged
@@ -6471,9 +6472,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   controller: {fileID: 1527486286}
-  localConfig: {fileID: 0}
   runOnStart: 1
-  selectedScenarios: []
+  selectedScenarios:
+  - X-n143-k7
   benchmarksFolder: Assets/HGS-Dynamic-CVRP/Generated Benchmarks
   instancesFolder: Assets/HGS-Dynamic-CVRP/Instances/CVRP
   solutionsFolder: Assets/HGS-Dynamic-CVRP/Solutions
@@ -6485,15 +6486,13 @@ MonoBehaviour:
   insertedCustomerServiceTime: 1
   runSolverTimeBudgetSeconds: 5
   replanOnBatchReleaseOnly: 1
-  debugSolverOutput: 1
   forceShowRoutes: 1
-  runSpeedMultiplier: 1
-  postInsertSpeedMultiplier: 0
+  runSpeedMultiplier: 20
   disablePerEventLogs: 1
-  runFixedStep: 0.05
-  runMaxSimStepsPerFrame: 4
+  runFixedStep: 0.2
+  runMaxSimStepsPerFrame: 20
   disableUiOverlaysDuringBatch: 1
-  runTruckSpeedOverride: 1
+  runTruckSpeedOverride: 12
   depotArrivalTolerance: 0.5
 --- !u!4 &1301807046
 Transform:
@@ -6510,6 +6509,22 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1301807047
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1301807044}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e82acbdce7a5e8b49a56fbdbfe1b1c1e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SimDiagnostics
+  controller: {fileID: 0}
+  simRenderer: {fileID: 0}
+  runOnStart: 1
+  autoRunDelay: 5
 --- !u!1 &1321222847
 GameObject:
   m_ObjectHideFlags: 0
@@ -7505,11 +7520,11 @@ MonoBehaviour:
   autoPlay: 1
   runStartupReplan: 1
   speedMultiplier: 1
-  fixedStep: 0.05
-  maxSimStepsPerFrame: 4
+  fixedStep: 0.1
+  maxSimStepsPerFrame: 50
   logEvents: 1
   demoTruckCount: 25
-  autoAssignDemoPlan: 0
+  autoAssignDemoPlan: 1
   demoTargetsPerTruck: 4
   autoReplan: 1
   replanPeriodicInterval: 2

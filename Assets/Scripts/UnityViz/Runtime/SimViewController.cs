@@ -29,7 +29,7 @@ public sealed class SimViewController : MonoBehaviour
 
     [Header("Demo Fleet")]
     public int demoTruckCount = 3;
-    public bool autoAssignDemoPlan = true;
+    public bool autoAssignDemoPlan = false;   // legacy: leave false — routes are owned by the planner
     public int demoTargetsPerTruck = 3;
 
     [Header("Auto Replan")]
@@ -48,6 +48,10 @@ public sealed class SimViewController : MonoBehaviour
     public float safetyMarginSeconds = 0.25f;
     public bool enableEarlyLockReplan = true;
 
+    [Header("Batch Control")]
+    [Tooltip("Set true by BenchmarkBatchRunner so SimViewController.Start() does not run its own ResetSim.")]
+    public bool suppressAutoStart = false;
+
     public SimState State { get; private set; }
     public Simulation Simulation { get; private set; }
     public ReplanController ReplanController { get; private set; }
@@ -58,6 +62,7 @@ public sealed class SimViewController : MonoBehaviour
     private int _lastEventCount;
     private string _resolvedInstancePath = string.Empty;
     private string _resolvedSolverExecutablePath = string.Empty;
+    private string _lastLoggedReplanSummary = string.Empty;
 
     private void Awake()
     {
@@ -71,6 +76,12 @@ public sealed class SimViewController : MonoBehaviour
 
     private void Start()
     {
+        if (suppressAutoStart)
+        {
+            Debug.Log("[SimViewController] suppressAutoStart=true, skipping auto ResetSim. BenchmarkBatchRunner owns init.");
+            return;
+        }
+
         ResetSim(seed, instancePath);
         if (autoPlay)
             Play();
@@ -98,6 +109,19 @@ public sealed class SimViewController : MonoBehaviour
 
             if (steps >= stepCap)
                 _accumulator = 0f;
+
+            // Echo replan events (start / applied) to the Unity console.
+            // ReplanController uses Console.WriteLine internally (no Unity dependency),
+            // so we track LastSummary here and forward any change to Debug.Log.
+            if (ReplanController != null)
+            {
+                string summary = ReplanController.LastSummary;
+                if (!string.IsNullOrEmpty(summary) && summary != _lastLoggedReplanSummary)
+                {
+                    _lastLoggedReplanSummary = summary;
+                    Debug.Log("[Replan] " + summary);
+                }
+            }
 
             LogNewEvents();
         }
@@ -144,6 +168,8 @@ public sealed class SimViewController : MonoBehaviour
     public void SetSpeedMultiplier(float value)
     {
         speedMultiplier = Mathf.Max(0f, value);
+        if (ReplanController != null)
+            ReplanController.SimTimeScale = speedMultiplier;
     }
 
     public void SetInstancePath(string path)
@@ -253,8 +279,11 @@ public sealed class SimViewController : MonoBehaviour
                 if (File.Exists(rootCandidate))
                     return rootCandidate;
 
+                // Search order: the HGS root folder (ships a Windows-native exe),
+                // then build-win (MSVC/NMake release), then build (may be a non-Windows binary).
                 string[] commonBuildRoots =
                 {
+                    Path.Combine(projectRoot, "Assets", "HGS-Dynamic-CVRP"),
                     Path.Combine(projectRoot, "Assets", "HGS-Dynamic-CVRP", "build-win"),
                     Path.Combine(projectRoot, "Assets", "HGS-Dynamic-CVRP", "build")
                 };
@@ -262,7 +291,7 @@ public sealed class SimViewController : MonoBehaviour
                 for (int b = 0; b < commonBuildRoots.Length; b++)
                 {
                     string candidate = Path.Combine(commonBuildRoots[b], variant);
-                    if (File.Exists(candidate))
+                    if (File.Exists(candidate) && IsWindowsExecutable(candidate))
                         return candidate;
                 }
             }
@@ -279,6 +308,21 @@ public sealed class SimViewController : MonoBehaviour
             values.Add(path + ".exe");
 
         return values;
+    }
+
+    /// <summary>
+    /// Checks that the file starts with the Windows PE magic bytes (MZ header),
+    /// so we don't accidentally resolve a Linux ELF binary as the solver.
+    /// </summary>
+    private static bool IsWindowsExecutable(string filePath)
+    {
+        try
+        {
+            using var fs = File.OpenRead(filePath);
+            var header = new byte[2];
+            return fs.Read(header, 0, 2) == 2 && header[0] == 'M' && header[1] == 'Z';
+        }
+        catch { return false; }
     }
 
     private static void AssignDemoPlans(SimState state, int targetsPerTruck)
@@ -332,16 +376,20 @@ public sealed class SimViewController : MonoBehaviour
         IPlanner planner;
         if (useHgsDynamicPlanner)
         {
+            string artifactsDir = Path.Combine(Application.dataPath, "LocalConfig", "solver-runs");
+            System.IO.Directory.CreateDirectory(artifactsDir);
             planner = new HgsDynamicPlanner
             {
                 SolverExecutablePath = _resolvedSolverExecutablePath,
                 InstancePath = _resolvedInstancePath,
                 SolverTimeBudgetSeconds = Mathf.Max(0f, solverTimeBudgetSeconds),
                 ProcessOverheadBufferSeconds = Mathf.Max(0f, processOverheadBufferSeconds),
-                SafetyMarginSeconds = Mathf.Max(0f, safetyMarginSeconds)
+                SafetyMarginSeconds = Mathf.Max(0f, safetyMarginSeconds),
+                ArtifactsDir = artifactsDir,
             };
 
             Debug.Log($"[HGS] solver path resolved: {_resolvedSolverExecutablePath}");
+            Debug.Log($"[HGS] artifacts dir: {artifactsDir}");
         }
         else
         {
@@ -360,5 +408,6 @@ public sealed class SimViewController : MonoBehaviour
         ReplanController.SolverTimeBudgetSeconds = Mathf.Max(0f, solverTimeBudgetSeconds);
         ReplanController.ProcessOverheadBufferSeconds = Mathf.Max(0f, processOverheadBufferSeconds);
         ReplanController.SafetyMarginSeconds = Mathf.Max(0f, safetyMarginSeconds);
+        ReplanController.SimTimeScale = Mathf.Max(0.001f, speedMultiplier);
     }
 }
